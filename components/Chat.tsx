@@ -4,14 +4,35 @@ import { useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { BookOpen } from 'lucide-react'
 import { Markdown } from '@/components/Markdown'
+import { TodoProposal } from '@/components/TodoProposal'
+import { TODO_MARK, type Proposal } from '@/lib/proposal'
+import { KIND } from '@/components/Todos'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 const YARN = 'Mochi tripped over the yarn, try again'
 const BEYOND = '📚 Beyond your notes'
 
+// Any line starting with the marker char is hidden; it becomes a card only if it parses.
+const isMark = (l: string) => l.startsWith('\u001E')
+
+// A partial line mid-stream fails to parse and is skipped, so no half-card shows.
+function parseProposal(line: string): Proposal | null {
+  if (!line.startsWith(TODO_MARK)) return null
+  try {
+    const p = JSON.parse(line.slice(TODO_MARK.length)) as Proposal
+    return typeof p?.subtopic_id === 'string' && typeof p.kind === 'string' && p.kind in KIND && typeof p.due === 'string' ? p : null
+  } catch {
+    return null
+  }
+}
+
 // Pull the "Beyond your notes" marker lines out as a small label, render the rest as markdown.
+// Proposal marker lines are taken out of the text and shown as to-do cards after it.
 function Answer({ text }: { text: string }) {
-  const parts = text.split(/^(?=📚 Beyond your notes)/m)
+  const lines = text.split('\n')
+  const body = lines.filter((l) => !isMark(l)).join('\n')
+  const cards = lines.filter(isMark).map(parseProposal).filter((p): p is Proposal => p !== null)
+  const parts = body.split(/^(?=📚 Beyond your notes)/m)
   return (
     <>
       {parts.map((p, i) =>
@@ -24,6 +45,7 @@ function Answer({ text }: { text: string }) {
           <Markdown key={i} text={p} />
         ),
       )}
+      {cards.map((p, i) => <TodoProposal key={i} p={p} />)}
     </>
   )
 }

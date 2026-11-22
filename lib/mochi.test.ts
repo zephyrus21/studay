@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { MODEL, SYSTEM_PROMPT, buildRequest, chatTitle, serializeTree } from '@/lib/mochi'
+import { MODEL, PROPOSE_TODO_TOOL, SYSTEM_PROMPT, buildRequest, chatTitle, encodeProposals, historyText, serializeTree, validProposals } from '@/lib/mochi'
+import { TODO_MARK } from '@/lib/proposal'
 
 const tree = [
   {
@@ -47,7 +48,7 @@ describe('buildRequest', () => {
     expect(sys[0].text).toBe(SYSTEM_PROMPT)
     expect(sys[1].text).toBe(serializeTree(tree))
     expect(sys[1].cache_control).toEqual({ type: 'ephemeral' })
-    expect(sys[2].text).toBe('Today is 2026-11-22.')
+    expect(sys[2].text).toBe('Today is Sunday 2026-11-22. Next days: Mon 2026-11-23, Tue 2026-11-24, Wed 2026-11-25, Thu 2026-11-26, Fri 2026-11-27, Sat 2026-11-28, Sun 2026-11-29.')
     expect(sys[2].cache_control).toBeUndefined()
   })
   test('system prompt rules', () => {
@@ -66,4 +67,51 @@ describe('chatTitle', () => {
   })
   test('does not split an emoji at the cut', () => expect(chatTitle('a'.repeat(58) + '🫀🫀🫀')).toBe('a'.repeat(58) + '🫀…'))
   test('exactly 60 chars is not cut', () => expect(chatTitle('b'.repeat(60))).toBe('b'.repeat(60)))
+})
+
+describe('proposals', () => {
+  const use = (input: unknown, name = 'propose_todo') => ({ type: 'tool_use', id: 'tu', name, input })
+  const ok = { subtopic_id: 'x1', kind: 'revise', due: '2026-11-28' }
+  test('serializeTree includes sub-topic ids', () => expect(serializeTree(tree)).toContain('Beta blockers [id: x1]'))
+  test('valid proposal is enriched with names', () =>
+    expect(validProposals([{ type: 'text', text: 'hi' }, use(ok)], tree, '2026-11-23')).toEqual([
+      { subtopic_id: 'x1', subtopic_name: 'Beta blockers', topic_name: 'Autonomic drugs', kind: 'revise', due: '2026-11-28' },
+    ]))
+  test('drops foreign id, bad kind, bad date, other tools, junk', () =>
+    expect(
+      validProposals(
+        [use({ ...ok, subtopic_id: 'zzz' }), use({ ...ok, kind: 'nap' }), use({ ...ok, due: '2026-02-30' }), use({ ...ok, due: 'tomorrow' }), use(ok, 'other'), use(null), null, 5],
+        tree, '2026-11-23',
+      ),
+    ).toEqual([]))
+  test('drops past dates, keeps today', () => {
+    expect(validProposals([use({ ...ok, due: '2026-11-22' })], tree, '2026-11-23')).toEqual([])
+    expect(validProposals([use({ ...ok, due: '2026-11-23' })], tree, '2026-11-23')).toHaveLength(1)
+  })
+  test('serializeTree strips the marker char from notes and names', () => {
+    const t = [{ ...tree[0], name: 'P\u001Eh', topics: [{ ...tree[0].topics[0], subtopics: [{ ...tree[0].topics[0].subtopics[0], notes: 'a\u001ETODO{}' }] }] }]
+    expect(serializeTree(t)).not.toContain('\u001E')
+  })
+  test('de-duplicates and keeps at most 3', () => {
+    const many = ['2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'].map((due) => use({ ...ok, due }))
+    expect(validProposals([use(ok), use(ok), ...many], tree, '2026-11-23')).toHaveLength(3)
+    expect(validProposals([use(ok), use(ok)], tree, '2026-11-23')).toHaveLength(1)
+  })
+  test('encode then historyText leaves plain text and no marker', () => {
+    const p = validProposals([use(ok)], tree, '2026-11-23')
+    const stored = `Want me to add it?${encodeProposals(p)}`
+    expect(stored).toContain(TODO_MARK)
+    const h = historyText(stored)
+    expect(h).not.toContain('\u001E')
+    expect(h).not.toContain('{')
+    expect(h).toContain('(Proposed to-do: Beta blockers · Revise · 2026-11-28)')
+  })
+  test('buildRequest includes the tool and rewrites markers', () => {
+    const stored = `Sure${encodeProposals(validProposals([use(ok)], tree, '2026-11-23'))}`
+    const r = buildRequest({ tree, today: '2026-11-23', messages: [{ role: 'user', content: 'q' }, { role: 'assistant', content: stored }, { role: 'user', content: 'ok' }] })
+    expect(r.tools).toEqual([PROPOSE_TODO_TOOL])
+    expect(JSON.stringify(r.messages)).not.toContain('\\u001e')
+    expect(JSON.stringify(r.messages)).toContain('Proposed to-do')
+    expect(SYSTEM_PROMPT).toContain('propose_todo')
+  })
 })

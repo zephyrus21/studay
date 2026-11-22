@@ -11,13 +11,13 @@ import type { getPickList, TodoKind, TodoRow } from '@/lib/data'
 
 type Pick = Awaited<ReturnType<typeof getPickList>>[number]
 
-const KIND: Record<TodoKind, { label: string; Icon: LucideIcon }> = {
+export const KIND: Record<TodoKind, { label: string; Icon: LucideIcon }> = {
   class: { label: 'Class', Icon: School },
   self: { label: 'Self', Icon: House },
   revise: { label: 'Revise', Icon: Repeat },
 }
 
-const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+export const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 const addDays = (d: string, n: number) => {
   const x = new Date(d + 'T00:00:00Z')
   x.setUTCDate(x.getUTCDate() + n)

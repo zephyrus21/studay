@@ -19,5 +19,5 @@ describe.skipIf(!run)('quota (TEST_DATABASE_URL)', async () => {
     const par = await Promise.all(Array.from({ length: 35 }, () => takeQuota(u, '2026-11-23')))
     expect(par.filter(Boolean)).toHaveLength(30)
     expect(await takeQuota(u, '2026-11-24')).toBe(true)
-  })
+  }, 30_000) // ~65 round trips to Neon; the 5s default is too tight over a real network
 })

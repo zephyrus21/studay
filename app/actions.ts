@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireUser } from '@/lib/session'
+import { requireUser, today } from '@/lib/session'
 import * as data from '@/lib/data'
 import { ICONS } from '@/lib/icons'
 
@@ -120,6 +120,16 @@ const todoKind = (v: unknown): data.TodoKind => (v === 'class' || v === 'self' |
 export async function addTodo(subtopicId: string, kind: string, d: string) {
   const u = await requireUser()
   return done(await data.createTodo(u.id, id(subtopicId), todoKind(kind), date(d) ?? bad()))
+}
+
+// For Mochi's to-do cards: no revalidate, because refreshing /ask remounts the chat and loses
+// the card's "Added" state. The to-do pages are dynamic and fetch fresh when opened.
+// Returns 'past' for a date before today, null when the sub-topic is gone.
+export async function addTodoFromChat(subtopicId: string, kind: string, d: string) {
+  const u = await requireUser()
+  const due = date(d) ?? bad()
+  if (due < (await today())) return 'past' as const
+  return data.createTodo(u.id, id(subtopicId), todoKind(kind), due)
 }
 
 export async function toggleTodo(todoId: string, isDone: boolean) {

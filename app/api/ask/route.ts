@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { after } from 'next/server'
 import { addChatMessage, chatExists, createChat, getRecentChatMessages, getTree, isUuid } from '@/lib/data'
-import { buildRequest, chatTitle } from '@/lib/mochi'
+import { buildRequest, chatTitle, encodeProposals, validProposals } from '@/lib/mochi'
 import { apiUser, today } from '@/lib/session'
 import { takeQuota } from '@/lib/usage'
 
@@ -67,9 +67,17 @@ export async function POST(req: Request) {
       try {
         if (req.signal.aborted) throw new Error('aborted')
         stream = new Anthropic().messages.stream(buildRequest({ tree, today: day, messages }))
-        stream.on('text', send)
+        stream.on('text', (t: string) => send(t.replaceAll('\u001E', ''))) // model text must not forge card markers
         const final = await stream.finalMessage()
         if (final.stop_reason === 'refusal') send(reply ? `\n\n${REFUSAL}` : REFUSAL)
+        else {
+          const proposals = validProposals(final.content, tree, day)
+          if (proposals.length) {
+            // Mochi sometimes calls the tool without saying anything; never show a bare card.
+            if (!reply.trim()) send(proposals.length === 1 ? 'Want me to add this to your to-dos?' : 'Want me to add these to your to-dos?')
+            send(encodeProposals(proposals))
+          }
+        }
       } catch {
         if (!req.signal.aborted) send(reply ? `\n\n${TRIPPED}` : TRIPPED)
       }

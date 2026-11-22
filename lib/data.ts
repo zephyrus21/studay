@@ -338,12 +338,19 @@ export async function getPickList(userId: string): Promise<PickRow[]> {
 }
 
 export async function createTodo(userId: string, subtopicId: string, kind: TodoKind, due: string): Promise<string | null> {
+  // Returns the existing open identical to-do instead of inserting a duplicate (re-tapping Add on a reopened chat).
   const r = await sql`
-    insert into todos (user_id, subtopic_id, kind, due)
-    select ${userId}, st.id, ${kind}, ${due}::date
-    from subtopics st join topics t on t.id = st.topic_id join subjects s on s.id = t.subject_id
-    where st.id::text = ${subtopicId} and s.user_id = ${userId}
-    returning id`
+    with ex as (
+      select id from todos
+      where user_id = ${userId} and subtopic_id::text = ${subtopicId} and kind = ${kind} and due = ${due}::date and done_at is null
+      limit 1),
+    ins as (
+      insert into todos (user_id, subtopic_id, kind, due)
+      select ${userId}, st.id, ${kind}, ${due}::date
+      from subtopics st join topics t on t.id = st.topic_id join subjects s on s.id = t.subject_id
+      where st.id::text = ${subtopicId} and s.user_id = ${userId} and not exists (select 1 from ex)
+      returning id)
+    select id from ex union all select id from ins`
   return r[0]?.id ?? null
 }
 

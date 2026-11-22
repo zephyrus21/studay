@@ -252,6 +252,16 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
       expect((await st(user, subs[1])).in_class).toBe(true)
     })
 
+    test('createTodo returns the existing open identical to-do', async () => {
+      const user = `${u1}-tododup`
+      const { subs } = await seed(user)
+      const t = (await d.createTodo(user, subs[0], 'revise', today))!
+      expect(await d.createTodo(user, subs[0], 'revise', today)).toBe(t)
+      expect(await d.getTodos(user)).toHaveLength(1)
+      await d.setTodoDone(user, t, true)
+      expect(await d.createTodo(user, subs[0], 'revise', today)).not.toBe(t)
+    })
+
     test('self tick applies and undoes', async () => {
       const user = `${u1}-todoself`
       const { subs } = await seed(user)
