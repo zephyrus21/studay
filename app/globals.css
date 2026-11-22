@@ -34,8 +34,9 @@
   box-shadow: var(--shadow-fab);
 }
 
+/* Dark follows the device unless the user forced light; data-theme="dark" forces dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-bg: #1E1A1C;
     --color-card: #2A2427;
     --color-ink: #F3E6E8;
@@ -48,6 +49,25 @@
     --shadow-nav: 0 6px 22px rgba(0,0,0,0.5);
     --shadow-fab: 0 6px 16px rgba(0,0,0,0.5);
   }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #1E1A1C;
+  --color-card: #2A2427;
+  --color-ink: #F3E6E8;
+  --color-line: #3E3338;
+  --color-chip: #3A2A31;
+  --color-brand: #F29BB0;
+  --color-self: #A792DB;
+  --color-revised: #6FBFA9;
+  --shadow-card: 0 2px 10px rgba(0,0,0,0.35);
+  --shadow-nav: 0 6px 22px rgba(0,0,0,0.5);
+  --shadow-fab: 0 6px 16px rgba(0,0,0,0.5);
 }
 
 body {

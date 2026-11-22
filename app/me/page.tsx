@@ -1,8 +1,12 @@
 import { Stethoscope } from 'lucide-react'
+import { cookies } from 'next/headers'
 import { PageHeader } from '@/components/PageHeader'
 import { SignOut } from '@/components/SignOut'
+import { ChangePassword } from '@/components/ChangePassword'
+import { ThemePicker } from '@/components/ThemePicker'
 import { getHome } from '@/lib/data'
 import { requireUser } from '@/lib/session'
+import { themeFrom } from '@/lib/theme'
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -20,6 +24,7 @@ export default async function Me() {
   const done = subjects.reduce((n, s) => n + s.done, 0)
   const total = subjects.reduce((n, s) => n + s.total, 0)
   const revisions = subjects.reduce((n, s) => n + s.revisions, 0)
+  const theme = themeFrom((await cookies()).get('theme')?.value) ?? 'system'
   return (
     <main className="mx-auto w-full max-w-md space-y-3 px-4 pb-16">
       <PageHeader title="Me" />
@@ -33,6 +38,11 @@ export default async function Me() {
         <Stat label="Sub-topics done" value={`${done} / ${total}`} />
         <Stat label="Revisions logged" value={revisions} />
       </div>
+      <div className="space-y-2 rounded-[20px] bg-card p-3.5 shadow-card">
+        <p className="font-bold">Appearance</p>
+        <ThemePicker initial={theme} />
+      </div>
+      <ChangePassword />
       <SignOut className="w-full" />
     </main>
   )

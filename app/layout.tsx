@@ -3,6 +3,8 @@ import { Nunito } from "next/font/google";
 import "./globals.css";
 import TzCookie from "@/components/TzCookie";
 import { BottomNav } from "@/components/BottomNav";
+import { cookies } from "next/headers";
+import { themeFrom } from "@/lib/theme";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -23,9 +25,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const theme = themeFrom((await cookies()).get("theme")?.value);
   return (
-    <html lang="en" className={`${nunito.variable} h-full antialiased`}>
+    <html lang="en" data-theme={theme} className={`${nunito.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}
         <BottomNav />
         <TzCookie />

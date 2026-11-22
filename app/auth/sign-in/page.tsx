@@ -17,26 +17,25 @@ export default function SignIn() {
     e.preventDefault()
     setBusy(true)
     setError('')
-    if (firstTime) {
-      const { error } = await authClient.signUp.email({ name, email, password })
-      if (error) {
-        setError(
-          error.code?.startsWith('USER_ALREADY_EXISTS')
+    try {
+      const { error } = firstTime
+        ? await authClient.signUp.email({ name, email, password })
+        : await authClient.signIn.email({ email, password })
+      if (error) throw error
+      window.location.href = '/'
+    } catch (err) {
+      // Neon's client throws 4xx errors (AuthApiError); a duplicate sign-up only keeps its message (User already exists).
+      const e = err as { code?: string; message?: string }
+      const code = `${e?.code ?? ''} ${e?.message ?? ''}`.toLowerCase()
+      setError(
+        !firstTime
+          ? 'Wrong email or password'
+          : code.includes('already exists') || code.includes('user_already_exists') || code.includes('email_exists')
             ? 'That email is already set up — sign in instead'
-            : error.message || 'Something went wrong, try again',
-        )
-        setBusy(false)
-        return
-      }
-    } else {
-      const { error } = await authClient.signIn.email({ email, password })
-      if (error) {
-        setError('Wrong email or password')
-        setBusy(false)
-        return
-      }
+            : 'Something went wrong, try again',
+      )
+      setBusy(false)
     }
-    window.location.href = '/'
   }
 
   return (

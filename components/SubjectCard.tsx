@@ -31,7 +31,6 @@ export function ProgressBars({ total, classCount, selfCount, revised }: { total:
 }
 
 export function SubjectCard({ s, today }: { s: Subject & Counts; today: string }) {
-  const pct = percent(s.done, s.total)
   const cd = countdown(s.exam_date, today)
   return (
     <Link href={`/s/${s.id}`} className="block rounded-[20px] bg-card p-3.5 shadow-card">
@@ -40,7 +39,6 @@ export function SubjectCard({ s, today }: { s: Subject & Counts; today: string }
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-chip"><SubjectIcon icon={s.icon} /></span>
           <span className="truncate">{s.name}</span>
         </span>
-        <span>{pct}%</span>
       </div>
       <div className="my-1.5 text-xs opacity-65">
         {s.done} of {s.total} sub-topics

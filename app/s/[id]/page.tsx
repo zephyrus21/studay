@@ -5,7 +5,7 @@ import { CountdownIcon, SubjectIcon } from '@/components/SubjectIcon'
 import { PageHeader } from '@/components/PageHeader'
 import { AddForm, ExamDate, ItemMenu } from '@/components/Forms'
 import { getSubject } from '@/lib/data'
-import { countdown, percent } from '@/lib/progress'
+import { countdown } from '@/lib/progress'
 import { requireUser, today } from '@/lib/session'
 
 export default async function SubjectPage({ params }: PageProps<'/s/[id]'>) {
@@ -32,7 +32,7 @@ export default async function SubjectPage({ params }: PageProps<'/s/[id]'>) {
       {topics.map((t) => (
         <div key={t.id} className="flex items-start gap-1 rounded-[20px] bg-card p-3.5 shadow-card">
           <Link href={`/t/${t.id}`} className="block min-w-0 flex-1">
-            <div className="flex justify-between gap-2 font-bold"><span className="truncate">{t.name}</span><span>{percent(t.done, t.total)}%</span></div>
+            <div className="truncate font-bold">{t.name}</div>
             <div className="my-1.5 text-xs opacity-65">{t.done} of {t.total} sub-topics</div>
             <ProgressBars total={t.total} classCount={t.class_count} selfCount={t.self_count} revised={t.revised} />
           </Link>

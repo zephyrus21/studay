@@ -10,8 +10,8 @@ import { createSubject, createTopic, createSubtopic, deleteSubject, deleteSubtop
 
 const del = { subject: deleteSubject, topic: deleteTopic, subtopic: deleteSubtopic }
 
-const input = 'block min-h-11 w-full rounded-full border-[1.5px] border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
-const btn = 'min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50'
+export const input = 'block min-h-11 w-full rounded-full border-[1.5px] border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
+export const btn = 'min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50'
 
 const TITLE = { subject: 'New subject', topic: 'New topic', subtopic: 'New sub-topic' }
 
