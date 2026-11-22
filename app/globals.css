@@ -50,3 +50,8 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
 }
+
+/* iOS Safari zooms into any field under 16px on focus. Unlayered, so it beats text-sm. */
+input, textarea, select {
+  font-size: max(16px, 1em);
+}
