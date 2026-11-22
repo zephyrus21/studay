@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { bumpRevision, updateSubtopic } from '@/app/actions'
 
 const chip = (on: boolean) =>
-  `rounded-full border-[1.2px] px-2.5 py-1 text-xs font-bold ${on ? 'border-accent bg-accent text-white' : 'border-line bg-chip'}`
+  `min-h-11 rounded-full border-[1.2px] px-3 text-xs font-bold ${on ? 'border-accent bg-accent text-white' : 'border-line bg-chip'}`
 
 export function MarkChips({
   id,

@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { useRef, useState } from 'react'
 import { Markdown } from '@/components/Markdown'
 import { Mochi } from '@/components/Mochi'
+import { PageHeader } from '@/components/PageHeader'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 const YARN = 'Mochi tripped over the yarn, try again 🧶'
@@ -72,12 +72,15 @@ export default function Ask() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-3 p-4">
-      <div className="flex items-center gap-2">
-        <Link href="/" aria-label="Back" className="text-brand">‹</Link>
-        <Mochi size={36} />
-        <span className="text-xl font-extrabold text-brand">Ask Mochi</span>
-      </div>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 px-4">
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            <Mochi size={36} />
+            <span className="truncate">Ask Mochi</span>
+          </span>
+        }
+      />
       <div className="flex-1 space-y-2">
         {msgs.length === 0 && <p className="py-6 text-center text-sm opacity-75">Ask about your notes, e.g. “What haven&apos;t I revised?” 🐾</p>}
         {msgs.map((m, i) => (
@@ -86,23 +89,24 @@ export default function Ask() {
             className={
               m.role === 'user'
                 ? 'ml-8 rounded-[14px] bg-accent px-3 py-2 text-sm'
-                : 'mr-8 rounded-[14px] border-[1.5px] border-line bg-card px-3 py-2'
+                : 'mr-8 rounded-[20px] bg-card px-3 py-2 shadow-[0_2px_10px_rgba(224,122,146,0.12)]'
             }
           >
             {m.role === 'user' ? m.content : m.content ? <Answer text={m.content} /> : <span className="text-sm opacity-60">Mochi is thinking…</span>}
           </div>
         ))}
-        <div ref={end} />
+        <div ref={end} className="scroll-mb-40" />
       </div>
-      <form onSubmit={send} className="sticky bottom-0 flex gap-2 bg-bg pb-2">
+      <form onSubmit={send} className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] flex gap-2 bg-bg pb-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           maxLength={4000}
           placeholder="Ask Mochi…"
-          className="min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-card px-4 py-2 text-sm"
+          aria-label="Ask Mochi"
+          className="min-h-11 min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-card px-4 py-2 text-sm"
         />
-        <button disabled={busy || !input.trim()} className="rounded-full bg-accent px-4 py-2 text-sm font-bold disabled:opacity-50">
+        <button disabled={busy || !input.trim()} className="min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold disabled:opacity-50">
           Send
         </button>
       </form>

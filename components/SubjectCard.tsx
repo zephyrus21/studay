@@ -14,7 +14,7 @@ export function SubjectCard({ s, today }: { s: Subject & Counts; today: string }
   const pct = percent(s.done, s.total)
   const cd = countdown(s.exam_date, today)
   return (
-    <Link href={`/s/${s.id}`} className="block rounded-[18px] border-[1.5px] border-line bg-card p-3.5 shadow-sm">
+    <Link href={`/s/${s.id}`} className="block rounded-[20px] bg-card p-3.5 shadow-[0_2px_10px_rgba(224,122,146,0.12)]">
       <div className="flex items-center justify-between gap-2 font-bold">
         <span className="flex min-w-0 items-center gap-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-chip text-base">{s.icon}</span>

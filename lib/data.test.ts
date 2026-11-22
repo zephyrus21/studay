@@ -125,4 +125,19 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     const [r] = await sql`select count(*)::int as n from subtopics where id = ${subs[0]}`
     expect(r.n).toBe(0)
   })
+
+  test('getRevise lists only done, never-revised sub-topics of this user', async () => {
+    const user = `${u1}-revise`
+    const { subs } = await seed(user, ['done', 'revised', 'untouched'])
+    await d.updateSubtopic(user, subs[0], { in_class: true })
+    await d.updateSubtopic(user, subs[1], { self_study: true })
+    await d.bumpRevision(user, subs[1], 1)
+    await seed(`${u2}-revise`, ['other'])
+    const rows = await d.getRevise(user)
+    expect(rows.map((r) => r.name)).toEqual(['done'])
+    expect(rows[0]).toMatchObject({ topic_name: 'T', subject_name: 'Anatomy', icon: '🫀', exam_date: null })
+    await d.bumpRevision(user, subs[0], 1)
+    expect(await d.getRevise(user)).toEqual([])
+    await sql`delete from subjects where user_id in (${user}, ${`${u2}-revise`})`
+  })
 })

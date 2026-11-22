@@ -104,6 +104,29 @@ export async function getTree(userId: string) {
   }))
 }
 
+export type ReviseRow = {
+  id: string
+  name: string
+  topic_name: string
+  subject_id: string
+  subject_name: string
+  icon: string
+  exam_date: string | null
+  subject_created_at: Date
+}
+
+export async function getRevise(userId: string): Promise<ReviseRow[]> {
+  const rows = await sql`
+    select st.id, st.name, t.name as topic_name, s.id as subject_id, s.name as subject_name, s.icon,
+      s.exam_date::text as exam_date, s.created_at as subject_created_at
+    from subtopics st
+    join topics t on t.id = st.topic_id
+    join subjects s on s.id = t.subject_id
+    where s.user_id = ${userId} and (st.in_class or st.self_study) and st.revision_count = 0
+    order by s.created_at, s.id, t.created_at, st.created_at`
+  return rows as ReviseRow[]
+}
+
 export async function createSubject(userId: string, name: string, icon: string): Promise<string> {
   const [r] = await sql`insert into subjects (user_id, name, icon) values (${userId}, ${name}, ${icon}) returning id`
   return r.id

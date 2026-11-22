@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
 import TzCookie from "@/components/TzCookie";
+import { BottomNav } from "@/components/BottomNav";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -16,12 +17,14 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#FFF8F2",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${nunito.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}
+        <BottomNav />
         <TzCookie />
       </body>
     </html>

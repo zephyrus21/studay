@@ -2,37 +2,38 @@
 
 import { useState, useTransition } from 'react'
 import { ICONS } from '@/lib/icons'
-import { createSubject, createTopic, createSubtopic, renameTopic, updateSubject, updateSubtopic } from '@/app/actions'
+import { useRouter } from 'next/navigation'
+import { Sheet } from '@/components/Sheet'
+import { createSubject, createTopic, createSubtopic, deleteSubject, deleteSubtopic, deleteTopic, renameTopic, updateSubject, updateSubtopic } from '@/app/actions'
 
-const input = 'min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
-const btn = 'rounded-full bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50'
+const del = { subject: deleteSubject, topic: deleteTopic, subtopic: deleteSubtopic }
 
-export function AddForm({ kind, parentId }: { kind: 'subject' | 'topic' | 'subtopic'; parentId?: string }) {
-  const [open, setOpen] = useState(false)
+const input = 'block min-h-11 w-full rounded-full border-[1.5px] border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
+const btn = 'min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50'
+
+const TITLE = { subject: 'New subject', topic: 'New topic', subtopic: 'New sub-topic' }
+
+type Kind = 'subject' | 'topic' | 'subtopic'
+
+// State lives here (not in AddForm) so it resets each time the sheet unmounts.
+function AddBody({ kind, parentId, close }: { kind: Kind; parentId?: string; close: () => void }) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState(ICONS[0])
   const [pending, start] = useTransition()
-  const label = `+ Add ${kind === 'subtopic' ? 'sub-topic' : kind}`
-  if (!open)
-    return (
-      <button type="button" onClick={() => setOpen(true)} className={`${btn} mx-auto block px-5`}>
-        {label}
-      </button>
-    )
   return (
     <form
-      className="space-y-2 rounded-[18px] border-[1.5px] border-dashed border-accent bg-card p-3"
+      className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault()
         start(async () => {
           if (kind === 'subject') await createSubject(name, icon)
           else if (kind === 'topic') await createTopic(parentId!, name)
           else await createSubtopic(parentId!, name)
-          setName('')
-          setOpen(false)
+          close()
         })
       }}
     >
+      <input autoFocus required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Name" className={input} />
       {kind === 'subject' && (
         <div className="flex flex-wrap gap-1.5">
           {ICONS.map((i) => (
@@ -41,48 +42,94 @@ export function AddForm({ kind, parentId }: { kind: 'subject' | 'topic' | 'subto
               type="button"
               aria-pressed={icon === i}
               onClick={() => setIcon(i)}
-              className={`grid h-9 w-9 place-items-center rounded-[10px] text-lg ${icon === i ? 'bg-accent' : 'bg-chip'}`}
+              className={`grid h-11 w-11 place-items-center rounded-[10px] text-lg ${icon === i ? 'bg-accent' : 'bg-chip'}`}
             >
               {i}
             </button>
           ))}
         </div>
       )}
-      <div className="flex gap-2">
-        <input autoFocus required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Name" className={input} />
-        <button disabled={pending || !name.trim()} className={btn}>Add</button>
-      </div>
+      <button disabled={pending || !name.trim()} className={`${btn} w-full`}>Add</button>
     </form>
   )
 }
 
-// Inline rename for a topic, sub-topic or subject.
-export function RenameForm({ kind, id, name }: { kind: 'subject' | 'topic' | 'subtopic'; id: string; name: string }) {
-  const [open, setOpen] = useState(false)
+export function AddForm({ kind, parentId }: { kind: Kind; parentId?: string }) {
+  return (
+    <Sheet
+      title={TITLE[kind]}
+      trigger={(open) => (
+        <button
+          type="button"
+          onClick={open}
+          aria-label={`Add ${kind === 'subtopic' ? 'sub-topic' : kind}`}
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-12 min-w-12 place-items-center rounded-2xl bg-brand text-3xl text-white shadow-[0_6px_16px_rgba(224,122,146,0.45)]"
+        >
+          +
+        </button>
+      )}
+    >
+      {(close) => <AddBody kind={kind} parentId={parentId} close={close} />}
+    </Sheet>
+  )
+}
+
+// "⋯" menu for a subject, topic or sub-topic: rename + delete.
+type MenuProps = { kind: Kind; id: string; name: string; deleteMessage: string; to?: string }
+
+function MenuBody({ kind, id, name, deleteMessage, to, close }: MenuProps & { close: () => void }) {
+  const router = useRouter()
   const [v, setV] = useState(name)
   const [pending, start] = useTransition()
-  if (!open)
-    return (
-      <button type="button" onClick={() => setOpen(true)} className="rounded-full px-2 py-1 text-xs font-bold text-brand">
-        Rename
-      </button>
-    )
   return (
-    <form
-      className="flex gap-2"
-      onSubmit={(e) => {
-        e.preventDefault()
-        start(async () => {
-          if (kind === 'topic') await renameTopic(id, v)
-          else if (kind === 'subject') await updateSubject(id, { name: v })
-          else await updateSubtopic(id, { name: v })
-          setOpen(false)
-        })
-      }}
+    <div className="space-y-3">
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          start(async () => {
+            if (kind === 'topic') await renameTopic(id, v)
+            else if (kind === 'subject') await updateSubject(id, { name: v })
+            else await updateSubtopic(id, { name: v })
+            close()
+          })
+        }}
+      >
+        <input autoFocus required maxLength={100} value={v} onChange={(e) => setV(e.target.value)} aria-label="New name" className={input} />
+        <button disabled={pending || !v.trim()} className={`${btn} w-full`}>Save</button>
+      </form>
+      <button
+        type="button"
+        disabled={pending}
+        className="min-h-11 w-full rounded-full border-[1.5px] border-line px-4 py-2 text-sm font-bold text-brand disabled:opacity-50"
+        onClick={() => {
+          if (!window.confirm(deleteMessage)) return
+          start(async () => {
+            // Leave a detail page before its item disappears, so it never flashes a 404.
+            if (to) router.replace(to)
+            await del[kind](id)
+            close()
+          })
+        }}
+      >
+        Delete
+      </button>
+    </div>
+  )
+}
+
+export function ItemMenu(p: MenuProps) {
+  return (
+    <Sheet
+      title={p.name}
+      trigger={(open) => (
+        <button type="button" onClick={open} aria-label={`Options for ${p.name}`} className="grid min-h-11 min-w-11 place-items-center rounded-full text-xl font-black text-brand">
+          ⋯
+        </button>
+      )}
     >
-      <input autoFocus required maxLength={100} value={v} onChange={(e) => setV(e.target.value)} aria-label="New name" className={input} />
-      <button disabled={pending || !v.trim()} className={btn}>Save</button>
-    </form>
+      {(close) => <MenuBody {...p} close={close} />}
+    </Sheet>
   )
 }
 
@@ -93,7 +140,7 @@ export function ExamDate({ id, value }: { id: string; value: string | null }) {
       await updateSubject(id, { exam_date: d })
     })
   return (
-    <div className={`flex items-center gap-2 ${pending ? 'opacity-60' : ''}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${pending ? 'opacity-60' : ''}`}>
       <label className="text-sm font-bold" htmlFor="exam">🗓 Exam date</label>
       <input id="exam" type="date" key={value ?? ''} defaultValue={value ?? ''} onChange={(e) => e.target.value && set(e.target.value)} className="rounded-full border-[1.5px] border-line bg-card px-3 py-1.5 text-sm" />
       {value && (
