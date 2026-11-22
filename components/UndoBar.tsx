@@ -25,7 +25,7 @@ export function UndoBar() {
   return (
     <div role="status" aria-live="polite">
       {last && (
-        <div className="fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md items-center gap-3 rounded-full bg-ink px-4 min-h-11 text-bg">
+        <div className="fixed inset-x-4 bottom-[calc(6.75rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md items-center gap-3 rounded-full bg-ink px-4 min-h-11 text-bg">
           <span className="min-w-0 flex-1 truncate">Revised {last.name}</span>
           <button
             type="button"

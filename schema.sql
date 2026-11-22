@@ -5,7 +5,6 @@ create table if not exists subjects (
   user_id text not null,
   name text not null,
   icon text not null,
-  exam_date date,
   created_at timestamptz not null default now()
 );
 create index if not exists subjects_user_id_idx on subjects(user_id);
@@ -18,11 +17,6 @@ create table if not exists exams (
   created_at timestamptz not null default now()
 );
 create index if not exists exams_subject_id_idx on exams(subject_id);
-
-insert into exams (subject_id, name, date)
-select s.id, 'Exam', s.exam_date from subjects s
-where s.exam_date is not null
-  and not exists (select 1 from exams e where e.subject_id = s.id and e.date = s.exam_date);
 
 create table if not exists topics (
   id uuid primary key default gen_random_uuid(),
@@ -45,6 +39,19 @@ create table if not exists subtopics (
   updated_at timestamptz not null default now()
 );
 create index if not exists subtopics_topic_id_idx on subtopics(topic_id);
+
+create table if not exists todos (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  subtopic_id uuid not null references subtopics(id) on delete cascade,
+  kind text not null check (kind in ('class','self','revise')),
+  due date not null,
+  done_at timestamptz,
+  applied boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists todos_user_due_idx on todos(user_id, due);
+create index if not exists todos_subtopic_id_idx on todos(subtopic_id);
 
 create table if not exists ai_usage (
   user_id text not null,

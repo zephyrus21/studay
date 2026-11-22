@@ -294,3 +294,110 @@ export async function deleteSubtopic(userId: string, id: string): Promise<boolea
     returning id`
   return r.length > 0
 }
+
+export type TodoKind = 'class' | 'self' | 'revise'
+export type TodoRow = {
+  id: string
+  kind: TodoKind
+  due: string
+  done_at: Date | null
+  subtopic_id: string
+  subtopic_name: string
+  topic_name: string
+  subject_name: string
+}
+
+export async function getTodos(userId: string): Promise<TodoRow[]> {
+  const rows = await sql`
+    select td.id, td.kind, td.due::text as due, td.done_at, td.subtopic_id,
+      st.name as subtopic_name, t.name as topic_name, s.name as subject_name
+    from todos td
+    join subtopics st on st.id = td.subtopic_id
+    join topics t on t.id = st.topic_id
+    join subjects s on s.id = t.subject_id
+    where td.user_id = ${userId} and s.user_id = ${userId}
+      and (td.done_at is null or td.id in (
+        select id from todos where user_id = ${userId} and done_at is not null
+        order by done_at desc limit 30))
+    order by td.due, td.created_at, td.id`
+  return rows as TodoRow[]
+}
+
+export type PickRow = { id: string; name: string; topic_name: string; subject_name: string; in_class: boolean; self_study: boolean }
+
+export async function getPickList(userId: string): Promise<PickRow[]> {
+  const rows = await sql`
+    select st.id, st.name, t.name as topic_name, s.name as subject_name, st.in_class, st.self_study
+    from subtopics st
+    join topics t on t.id = st.topic_id
+    join subjects s on s.id = t.subject_id
+    where s.user_id = ${userId}
+    order by s.created_at, s.id, t.created_at, t.id, st.created_at, st.id`
+  return rows as PickRow[]
+}
+
+export async function createTodo(userId: string, subtopicId: string, kind: TodoKind, due: string): Promise<string | null> {
+  const r = await sql`
+    insert into todos (user_id, subtopic_id, kind, due)
+    select ${userId}, st.id, ${kind}, ${due}::date
+    from subtopics st join topics t on t.id = st.topic_id join subjects s on s.id = t.subject_id
+    where st.id::text = ${subtopicId} and s.user_id = ${userId}
+    returning id`
+  return r[0]?.id ?? null
+}
+
+// One statement: lock the todo, flip done_at (guarded on its current state), then apply/reverse the effect.
+export async function setTodoDone(userId: string, id: string, done: boolean): Promise<boolean> {
+  const r = done
+    ? await sql`
+      with t as (
+        select td.id, td.kind, st.in_class, st.self_study
+        from todos td join subtopics st on st.id = td.subtopic_id
+        where td.id::text = ${id} and td.user_id = ${userId} and td.done_at is null
+        for update of td),
+      u as (
+        update todos set done_at = now(),
+          applied = case t.kind when 'class' then not t.in_class when 'self' then not t.self_study else true end
+        from t where todos.id = t.id and todos.done_at is null
+        returning todos.subtopic_id, todos.kind, todos.applied)
+      update subtopics set
+        in_class = in_class or (u.kind = 'class' and u.applied),
+        self_study = self_study or (u.kind = 'self' and u.applied),
+        revision_count = revision_count + case when u.kind = 'revise' then 1 else 0 end,
+        last_revised_at = case when u.kind = 'revise' then now() else last_revised_at end,
+        updated_at = now()
+      from u where subtopics.id = u.subtopic_id
+      returning subtopics.id`
+    : await sql`
+      with t as (
+        select td.id, td.kind, td.applied
+        from todos td
+        where td.id::text = ${id} and td.user_id = ${userId} and td.done_at is not null
+        for update of td),
+      u as (
+        update todos set done_at = null, applied = false
+        from t where todos.id = t.id and todos.done_at is not null
+        returning todos.subtopic_id, t.kind, t.applied)
+      update subtopics set
+        in_class = in_class and not (u.kind = 'class' and u.applied),
+        self_study = self_study and not (u.kind = 'self' and u.applied),
+        revision_count = greatest(revision_count - case when u.kind = 'revise' and u.applied then 1 else 0 end, 0),
+        last_revised_at = case
+          when u.kind = 'revise' and u.applied and revision_count - 1 <= 0 then null
+          else last_revised_at end,
+        updated_at = now()
+      from u where subtopics.id = u.subtopic_id
+      returning subtopics.id`
+  return r.length > 0
+}
+
+export async function updateTodoDue(userId: string, id: string, due: string): Promise<boolean> {
+  const r = await sql`
+    update todos set due = ${due}::date where id::text = ${id} and user_id = ${userId} returning id`
+  return r.length > 0
+}
+
+export async function deleteTodo(userId: string, id: string): Promise<boolean> {
+  const r = await sql`delete from todos where id::text = ${id} and user_id = ${userId} returning id`
+  return r.length > 0
+}

@@ -205,4 +205,92 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     const [r] = await sql`select count(*)::int as n from exams where id = ${ex}`
     expect(r.n).toBe(0)
   })
+
+  describe('todos', () => {
+    const st = async (user: string, sid: string) =>
+      (await d.getSubtopic(user, sid))!.subtopic
+
+    test('create, read, update, delete, scoping', async () => {
+      const user = `${u1}-todo`
+      const { subs } = await seed(user)
+      expect(await d.createTodo(u2, subs[0], 'class', today)).toBeNull()
+      const t = (await d.createTodo(user, subs[0], 'class', today))!
+      expect(await d.getTodos(user)).toMatchObject([
+        { id: t, kind: 'class', due: today, done_at: null, subtopic_name: 's', topic_name: 'T', subject_name: 'Anatomy' },
+      ])
+      expect(await d.getTodos(u2)).toEqual([])
+      expect((await d.getPickList(user))[0]).toMatchObject({ id: subs[0], in_class: false, self_study: false })
+      expect(await d.getPickList(u2)).toEqual([])
+      expect(await d.updateTodoDue(u2, t, '2026-12-01')).toBe(false)
+      expect(await d.setTodoDone(u2, t, true)).toBe(false)
+      expect(await d.deleteTodo(u2, t)).toBe(false)
+      expect((await st(user, subs[0])).in_class).toBe(false)
+      expect(await d.updateTodoDue(user, t, '2026-12-01')).toBe(true)
+      expect((await d.getTodos(user))[0].due).toBe('2026-12-01')
+      expect(await d.setTodoDone(user, t, true)).toBe(true)
+      expect((await d.getTodos(user))[0].done_at).not.toBeNull()
+      expect(await d.deleteTodo(user, t)).toBe(true)
+      expect(await d.getTodos(user)).toEqual([])
+    })
+
+    test('class tick applies and undoes; already ticked is not undone', async () => {
+      const user = `${u1}-todoclass`
+      const { subs } = await seed(user, ['a', 'b'])
+      const t = (await d.createTodo(user, subs[0], 'class', today))!
+      expect(await d.setTodoDone(user, t, true)).toBe(true)
+      expect((await st(user, subs[0])).in_class).toBe(true)
+      expect(await d.setTodoDone(user, t, true)).toBe(false)
+      expect(await d.setTodoDone(user, t, false)).toBe(true)
+      expect((await st(user, subs[0])).in_class).toBe(false)
+      expect(await d.setTodoDone(user, t, false)).toBe(false)
+
+      await d.updateSubtopic(user, subs[1], { in_class: true })
+      const t2 = (await d.createTodo(user, subs[1], 'class', today))!
+      expect(await d.setTodoDone(user, t2, true)).toBe(true)
+      expect(await d.setTodoDone(user, t2, false)).toBe(true)
+      expect((await st(user, subs[1])).in_class).toBe(true)
+    })
+
+    test('self tick applies and undoes', async () => {
+      const user = `${u1}-todoself`
+      const { subs } = await seed(user)
+      const t = (await d.createTodo(user, subs[0], 'self', today))!
+      await d.setTodoDone(user, t, true)
+      expect((await st(user, subs[0])).self_study).toBe(true)
+      await d.setTodoDone(user, t, false)
+      expect((await st(user, subs[0])).self_study).toBe(false)
+    })
+
+    test('revise round-trip restores count and last_revised_at; no double apply', async () => {
+      const user = `${u1}-todorevise`
+      const { subs } = await seed(user)
+      const t = (await d.createTodo(user, subs[0], 'revise', today))!
+      expect(await d.setTodoDone(user, t, true)).toBe(true)
+      expect(await d.setTodoDone(user, t, true)).toBe(false)
+      let s = await st(user, subs[0])
+      expect(s.revision_count).toBe(1)
+      expect(s.last_revised_at).not.toBeNull()
+      expect(await d.setTodoDone(user, t, false)).toBe(true)
+      expect(await d.setTodoDone(user, t, false)).toBe(false)
+      s = await st(user, subs[0])
+      expect(s.revision_count).toBe(0)
+      expect(s.last_revised_at).toBeNull()
+
+      await d.bumpRevision(user, subs[0], 1)
+      await d.bumpRevision(user, subs[0], 1)
+      await d.setTodoDone(user, t, true)
+      await d.setTodoDone(user, t, false)
+      expect((await st(user, subs[0])).revision_count).toBe(2)
+      expect((await st(user, subs[0])).last_revised_at).not.toBeNull()
+    })
+
+    test('deleting a sub-topic removes its to-dos', async () => {
+      const user = `${u1}-todocascade`
+      const { subs } = await seed(user)
+      const t = (await d.createTodo(user, subs[0], 'self', today))!
+      await d.deleteSubtopic(user, subs[0])
+      const [r] = await sql`select count(*)::int as n from todos where id = ${t}`
+      expect(r.n).toBe(0)
+    })
+  })
 })

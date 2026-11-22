@@ -114,3 +114,25 @@ export async function deleteSubtopic(sid: string) {
   const u = await requireUser()
   return done(await data.deleteSubtopic(u.id, id(sid)))
 }
+
+const todoKind = (v: unknown): data.TodoKind => (v === 'class' || v === 'self' || v === 'revise' ? v : bad())
+
+export async function addTodo(subtopicId: string, kind: string, d: string) {
+  const u = await requireUser()
+  return done(await data.createTodo(u.id, id(subtopicId), todoKind(kind), date(d) ?? bad()))
+}
+
+export async function toggleTodo(todoId: string, isDone: boolean) {
+  const u = await requireUser()
+  return done(await data.setTodoDone(u.id, id(todoId), bool(isDone)))
+}
+
+export async function moveTodo(todoId: string, d: string) {
+  const u = await requireUser()
+  return done(await data.updateTodoDue(u.id, id(todoId), date(d) ?? bad()))
+}
+
+export async function removeTodo(todoId: string) {
+  const u = await requireUser()
+  return done(await data.deleteTodo(u.id, id(todoId)))
+}
