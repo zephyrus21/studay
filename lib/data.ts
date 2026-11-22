@@ -1,4 +1,5 @@
 import { sql } from '@/lib/db'
+import type { ChatMessage } from '@/lib/mochi'
 
 export type Subject = { id: string; name: string; icon: string; created_at: Date }
 export type Exam = { id: string; subject_id: string; name: string; date: string; created_at: Date }
@@ -399,5 +400,58 @@ export async function updateTodoDue(userId: string, id: string, due: string): Pr
 
 export async function deleteTodo(userId: string, id: string): Promise<boolean> {
   const r = await sql`delete from todos where id::text = ${id} and user_id = ${userId} returning id`
+  return r.length > 0
+}
+
+export const isUuid = (v: unknown): v is string =>
+  typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+
+export type ChatSummary = { id: string; title: string; updated_at: Date }
+
+export async function getChats(userId: string): Promise<ChatSummary[]> {
+  const rows = await sql`
+    select id::text, title, updated_at from chats
+    where user_id = ${userId} order by updated_at desc, id limit 100`
+  return rows as ChatSummary[]
+}
+
+export async function chatExists(userId: string, chatId: string): Promise<boolean> {
+  const r = await sql`select 1 from chats where id = ${chatId}::uuid and user_id = ${userId} limit 1`
+  return r.length > 0
+}
+
+export async function getChatMessages(userId: string, chatId: string): Promise<ChatMessage[] | null> {
+  if (!(await chatExists(userId, chatId))) return null
+  const rows = await sql`
+    select m.role, m.content from chat_messages m
+    where m.chat_id = ${chatId}::uuid order by m.created_at, m.id`
+  return rows as ChatMessage[]
+}
+
+// Last `limit` messages, oldest first (Claude context).
+export async function getRecentChatMessages(userId: string, chatId: string, limit = 20): Promise<ChatMessage[]> {
+  const rows = await sql`
+    select m.role, m.content from chat_messages m join chats c on c.id = m.chat_id
+    where m.chat_id = ${chatId}::uuid and c.user_id = ${userId}
+    order by m.created_at desc, m.id desc limit ${limit}`
+  return (rows as ChatMessage[]).reverse()
+}
+
+export async function createChat(userId: string, title: string): Promise<string> {
+  const [r] = await sql`insert into chats (user_id, title) values (${userId}, ${title}) returning id::text`
+  return r.id
+}
+
+export async function addChatMessage(userId: string, chatId: string, role: ChatMessage['role'], content: string): Promise<boolean> {
+  const r = await sql`
+    with c as (update chats set updated_at = now() where id = ${chatId}::uuid and user_id = ${userId} returning id)
+    insert into chat_messages (chat_id, role, content)
+    select id, ${role}, ${content} from c
+    returning id`
+  return r.length > 0
+}
+
+export async function deleteChat(userId: string, id: string): Promise<boolean> {
+  const r = await sql`delete from chats where id = ${id}::uuid and user_id = ${userId} returning id`
   return r.length > 0
 }

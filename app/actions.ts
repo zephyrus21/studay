@@ -136,3 +136,15 @@ export async function removeTodo(todoId: string) {
   const u = await requireUser()
   return done(await data.deleteTodo(u.id, id(todoId)))
 }
+
+// Fresh list each time History opens: chats started on this page aren't in the server-rendered props.
+export async function listChats() {
+  const u = await requireUser()
+  return data.getChats(u.id)
+}
+
+export async function removeChat(chatId: string) {
+  const u = await requireUser()
+  // No revalidate: it would re-render the deleted chat's page (404 flash); the client refreshes itself.
+  return data.isUuid(chatId) ? data.deleteChat(u.id, chatId) : false
+}

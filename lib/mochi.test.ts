@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { MODEL, SYSTEM_PROMPT, buildRequest, serializeTree } from '@/lib/mochi'
+import { MODEL, SYSTEM_PROMPT, buildRequest, chatTitle, serializeTree } from '@/lib/mochi'
 
 const tree = [
   {
@@ -54,4 +54,16 @@ describe('buildRequest', () => {
     expect(SYSTEM_PROMPT).toContain('📚 Beyond your notes')
     expect(SYSTEM_PROMPT).toContain('not clinical advice')
   })
+})
+
+describe('chatTitle', () => {
+  test('short question is kept', () => expect(chatTitle('What is a beta blocker?')).toBe('What is a beta blocker?'))
+  test('uses the first non-empty line', () => expect(chatTitle('\n  \n  Hello there \nsecond line')).toBe('Hello there'))
+  test('cuts to 60 chars with an ellipsis', () => {
+    const t = chatTitle('a'.repeat(100))
+    expect(t).toBe('a'.repeat(59) + '…')
+    expect(t).toHaveLength(60)
+  })
+  test('does not split an emoji at the cut', () => expect(chatTitle('a'.repeat(58) + '🫀🫀🫀')).toBe('a'.repeat(58) + '🫀…'))
+  test('exactly 60 chars is not cut', () => expect(chatTitle('b'.repeat(60))).toBe('b'.repeat(60)))
 })

@@ -12,6 +12,12 @@ Use the exam dates and today's date for countdowns and to suggest what to revise
 type Tree = Awaited<ReturnType<typeof getTree>>
 export type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
+export function chatTitle(question: string): string {
+  const line = question.split('\n').map((l) => l.trim()).find(Boolean) ?? ''
+  const cps = Array.from(line)
+  return cps.length > 60 ? `${cps.slice(0, 59).join('')}…` : line
+}
+
 export function serializeTree(tree: Tree): string {
   if (tree.length === 0) return 'The student has no subjects yet.'
   return tree

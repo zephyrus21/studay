@@ -14,6 +14,7 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
 
   afterAll(async () => {
     await sql`delete from subjects where user_id like ${prefix + '%'}`
+    await sql`delete from chats where user_id like ${prefix + '%'}`
   })
 
   async function seed(user: string, names: string[] = ['s']) {
@@ -292,5 +293,39 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
       const [r] = await sql`select count(*)::int as n from todos where id = ${t}`
       expect(r.n).toBe(0)
     })
+  })
+
+  test('chats: create, add, read in order, scoping, delete cascade', async () => {
+    const user = `${u1}-chat`
+    const other = `${u2}-chat`
+    const c = await d.createChat(user, 'Hello')
+    expect(await d.addChatMessage(user, c, 'user', 'q1')).toBe(true)
+    expect(await d.addChatMessage(user, c, 'assistant', 'a1')).toBe(true)
+    expect(await d.addChatMessage(user, c, 'user', 'q2')).toBe(true)
+    expect((await d.getChatMessages(user, c))!.map((m) => m.content)).toEqual(['q1', 'a1', 'q2'])
+    expect((await d.getChatMessages(user, c))![1]).toEqual({ role: 'assistant', content: 'a1' })
+    const [first] = await d.getChats(user)
+    expect(first).toMatchObject({ id: c, title: 'Hello' })
+    expect(first.updated_at).toBeInstanceOf(Date)
+    const c2 = await d.createChat(user, 'Newer')
+    expect((await d.getChats(user)).map((x) => x.id)).toEqual([c2, c])
+    await d.addChatMessage(user, c, 'user', 'q3')
+    expect((await d.getChats(user))[0].id).toBe(c)
+
+    expect((await d.getRecentChatMessages(user, c, 2)).map((m) => m.content)).toEqual(['q2', 'q3'])
+    expect(await d.getRecentChatMessages(other, c)).toEqual([])
+    expect(await d.chatExists(user, c)).toBe(true)
+    expect(await d.chatExists(other, c)).toBe(false)
+    expect(await d.getChatMessages(other, c)).toBeNull()
+    expect(await d.addChatMessage(other, c, 'user', 'x')).toBe(false)
+    expect(await d.getChats(other)).toEqual([])
+    expect(await d.deleteChat(other, c)).toBe(false)
+    expect(await d.getChatMessages(user, c)).toHaveLength(4)
+
+    expect(await d.deleteChat(user, c)).toBe(true)
+    expect(await d.getChatMessages(user, c)).toBeNull()
+    const [r] = await sql`select count(*)::int as n from chat_messages where chat_id::text = ${c}`
+    expect(r.n).toBe(0)
+    expect((await d.getChats(user)).map((x) => x.id)).toEqual([c2])
   })
 })
