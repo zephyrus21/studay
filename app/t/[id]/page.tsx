@@ -22,7 +22,7 @@ export default async function TopicPage({ params }: PageProps<'/t/[id]'>) {
           <div className="flex items-center justify-between gap-2 font-bold">
             <Link href={`/n/${st.id}`} className="min-w-0 flex-1 truncate py-2">{st.name}</Link>
             <span className="shrink-0"><RevisionStamp count={st.revision_count} done={isDone(st)} /></span>
-            <span className="shrink-0"><ItemMenu kind="subtopic" id={st.id} name={st.name} deleteMessage={`Delete ${st.name}?`} /></span>
+            <span className="shrink-0"><ItemMenu kind="subtopic" id={st.id} name={st.name} revisions={st.revision_count} deleteMessage={`Delete ${st.name}?`} /></span>
           </div>
           <MarkChips id={st.id} inClass={st.in_class} selfStudy={st.self_study} />
         </div>

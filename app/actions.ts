@@ -21,6 +21,10 @@ const date = (v: unknown) => {
   const d = new Date(v + 'T00:00:00Z')
   return d.toISOString().slice(0, 10) === v ? v : bad()
 }
+const examName = (v: unknown) => {
+  const s = typeof v === 'string' ? v.trim() : ''
+  return s.length >= 1 && s.length <= 60 ? s : bad()
+}
 const id = (v: unknown) => (typeof v === 'string' && v ? v : bad())
 
 async function done<T>(r: T): Promise<T> {
@@ -33,19 +37,37 @@ export async function createSubject(n: string, i: string) {
   return done(await data.createSubject(u.id, name(n), icon(i)))
 }
 
-export async function updateSubject(sid: string, patch: { name?: string; icon?: string; exam_date?: string | null }) {
+export async function updateSubject(sid: string, patch: { name?: string; icon?: string }) {
   const u = await requireUser()
   if (typeof patch !== 'object' || patch === null) bad()
   const p: typeof patch = {}
   if (patch.name !== undefined) p.name = name(patch.name)
   if (patch.icon !== undefined) p.icon = icon(patch.icon)
-  if ('exam_date' in patch) p.exam_date = date(patch.exam_date)
   return done(await data.updateSubject(u.id, id(sid), p))
 }
 
 export async function deleteSubject(sid: string) {
   const u = await requireUser()
   return done(await data.deleteSubject(u.id, id(sid)))
+}
+
+export async function createExam(subjectId: string, n: string, d: string) {
+  const u = await requireUser()
+  return done(await data.createExam(u.id, id(subjectId), examName(n), date(d) ?? bad()))
+}
+
+export async function updateExam(eid: string, patch: { name?: string; date?: string }) {
+  const u = await requireUser()
+  if (typeof patch !== 'object' || patch === null) bad()
+  const p: typeof patch = {}
+  if (patch.name !== undefined) p.name = examName(patch.name)
+  if (patch.date !== undefined) p.date = date(patch.date) ?? bad()
+  return done(await data.updateExam(u.id, id(eid), p))
+}
+
+export async function deleteExam(eid: string) {
+  const u = await requireUser()
+  return done(await data.deleteExam(u.id, id(eid)))
 }
 
 export async function createTopic(subjectId: string, n: string) {

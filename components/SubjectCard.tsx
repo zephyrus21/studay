@@ -30,8 +30,8 @@ export function ProgressBars({ total, classCount, selfCount, revised }: { total:
   )
 }
 
-export function SubjectCard({ s, today }: { s: Subject & Counts; today: string }) {
-  const cd = countdown(s.exam_date, today)
+export function SubjectCard({ s, today }: { s: Subject & Counts & { exam_name: string | null; exam_date: string | null }; today: string }) {
+  const cd = countdown(s.exam_date, today, s.exam_name ?? 'Exam')
   return (
     <Link href={`/s/${s.id}`} className="block rounded-[20px] bg-card p-3.5 shadow-card">
       <div className="flex items-center justify-between gap-2 font-bold">

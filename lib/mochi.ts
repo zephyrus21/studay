@@ -27,7 +27,7 @@ export function serializeTree(tree: Tree): string {
           return `  Topic: ${t.name}${subs ? `\n${subs}` : ''}`
         })
         .join('\n')
-      return `Subject: ${s.name}${s.exam_date ? ` (exam ${s.exam_date})` : ''}${topics ? `\n${topics}` : ''}`
+      return `Subject: ${s.name}${s.exams.length ? ` (exams: ${s.exams.map((e) => `${e.name} ${e.date}`).join(', ')})` : ''}${topics ? `\n${topics}` : ''}`
     })
     .join('\n\n')
 }

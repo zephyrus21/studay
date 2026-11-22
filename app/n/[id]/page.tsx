@@ -26,10 +26,10 @@ export default async function SubtopicPage({ params }: PageProps<'/n/[id]'>) {
       <PageHeader
         back={{ href: `/t/${topic.id}`, label: topic.name }}
         title={st.name}
-        right={<ItemMenu kind="subtopic" id={st.id} name={st.name} to={`/t/${topic.id}`} deleteMessage={`Delete ${st.name}?`} />}
+        right={<ItemMenu kind="subtopic" id={st.id} name={st.name} revisions={st.revision_count} to={`/t/${topic.id}`} deleteMessage={`Delete ${st.name}?`} />}
       />
       <RevisionStamp count={st.revision_count} done={isDone(st)} />
-      <MarkChips id={st.id} inClass={st.in_class} selfStudy={st.self_study} canUndo revisions={st.revision_count} />
+      <MarkChips id={st.id} inClass={st.in_class} selfStudy={st.self_study} />
       {st.last_revised_at && (
         <p className="text-xs opacity-65">Last revised {st.last_revised_at.toLocaleDateString('en-GB', { dateStyle: 'medium', timeZone: tz })}</p>
       )}

@@ -10,6 +10,20 @@ create table if not exists subjects (
 );
 create index if not exists subjects_user_id_idx on subjects(user_id);
 
+create table if not exists exams (
+  id uuid primary key default gen_random_uuid(),
+  subject_id uuid not null references subjects(id) on delete cascade,
+  name text not null,
+  date date not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists exams_subject_id_idx on exams(subject_id);
+
+insert into exams (subject_id, name, date)
+select s.id, 'Exam', s.exam_date from subjects s
+where s.exam_date is not null
+  and not exists (select 1 from exams e where e.subject_id = s.id and e.date = s.exam_date);
+
 create table if not exists topics (
   id uuid primary key default gen_random_uuid(),
   subject_id uuid not null references subjects(id) on delete cascade,

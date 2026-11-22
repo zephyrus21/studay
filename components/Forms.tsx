@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { Undo2 } from 'lucide-react'
 import { ICONS } from '@/lib/icons'
 import { SUBJECT_LABELS, SubjectIcon } from '@/components/SubjectIcon'
 import { useRouter } from 'next/navigation'
 import { Sheet } from '@/components/Sheet'
-import { createSubject, createTopic, createSubtopic, deleteSubject, deleteSubtopic, deleteTopic, renameTopic, updateSubject, updateSubtopic } from '@/app/actions'
+import { bumpRevision, createSubject, createTopic, createSubtopic, deleteSubject, deleteSubtopic, deleteTopic, renameTopic, updateSubject, updateSubtopic } from '@/app/actions'
 
 const del = { subject: deleteSubject, topic: deleteTopic, subtopic: deleteSubtopic }
 
@@ -77,10 +77,10 @@ export function AddForm({ kind, parentId }: { kind: Kind; parentId?: string }) {
   )
 }
 
-// "⋯" menu for a subject, topic or sub-topic: rename + delete.
-type MenuProps = { kind: Kind; id: string; name: string; deleteMessage: string; to?: string }
+// "⋯" menu for a subject, topic or sub-topic: rename + undo revision (sub-topics) + delete.
+type MenuProps = { kind: Kind; id: string; name: string; deleteMessage: string; to?: string; revisions?: number }
 
-function MenuBody({ kind, id, name, deleteMessage, to, close }: MenuProps & { close: () => void }) {
+function MenuBody({ kind, id, name, deleteMessage, to, revisions, close }: MenuProps & { close: () => void }) {
   const router = useRouter()
   const [v, setV] = useState(name)
   const [pending, start] = useTransition()
@@ -101,6 +101,22 @@ function MenuBody({ kind, id, name, deleteMessage, to, close }: MenuProps & { cl
         <input autoFocus required maxLength={100} value={v} onChange={(e) => setV(e.target.value)} aria-label="New name" className={input} />
         <button disabled={pending || !v.trim()} className={`${btn} w-full`}>Save</button>
       </form>
+      {kind === 'subtopic' && revisions !== undefined && (
+        <button
+          type="button"
+          disabled={pending || revisions === 0}
+          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border-[1.5px] border-line px-4 py-2 text-sm font-bold text-ink disabled:opacity-50"
+          onClick={() =>
+            start(async () => {
+              await bumpRevision(id, -1)
+              close()
+            })
+          }
+        >
+          <Undo2 size={16} aria-hidden />
+          Undo a revision (−1)
+        </button>
+      )}
       <button
         type="button"
         disabled={pending}
@@ -133,24 +149,5 @@ export function ItemMenu(p: MenuProps) {
     >
       {(close) => <MenuBody {...p} close={close} />}
     </Sheet>
-  )
-}
-
-export function ExamDate({ id, value }: { id: string; value: string | null }) {
-  const [pending, start] = useTransition()
-  const set = (d: string | null) =>
-    start(async () => {
-      await updateSubject(id, { exam_date: d })
-    })
-  return (
-    <div className={`flex flex-wrap items-center gap-2 ${pending ? 'opacity-60' : ''}`}>
-      <label className="inline-flex items-center gap-1 text-sm font-bold" htmlFor="exam"><CalendarDays size={16} aria-hidden />Exam date</label>
-      <input id="exam" type="date" key={value ?? ''} defaultValue={value ?? ''} onChange={(e) => e.target.value && set(e.target.value)} className="rounded-full border-[1.5px] border-line bg-card px-3 py-1.5 text-sm" />
-      {value && (
-        <button type="button" onClick={() => set(null)} className="rounded-full px-2 py-1 text-xs font-bold text-brand">
-          Clear
-        </button>
-      )}
-    </div>
   )
 }

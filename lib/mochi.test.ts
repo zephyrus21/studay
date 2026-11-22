@@ -3,7 +3,7 @@ import { MODEL, SYSTEM_PROMPT, buildRequest, serializeTree } from '@/lib/mochi'
 
 const tree = [
   {
-    id: 's1', name: 'Pharmacology', icon: '💊', exam_date: '2026-12-10', created_at: new Date(),
+    id: 's1', name: 'Pharmacology', icon: '💊', exams: [{ name: 'Prelims', date: '2026-12-10' }], created_at: new Date(),
     topics: [
       {
         id: 't1', subject_id: 's1', name: 'Autonomic drugs', created_at: new Date(),
@@ -21,7 +21,7 @@ const tree = [
 describe('serializeTree', () => {
   test('includes names, exam, marks and notes', () => {
     const out = serializeTree(tree)
-    for (const s of ['Pharmacology', 'exam 2026-12-10', 'Autonomic drugs', 'Beta blockers', 'class ✓', 'revised 2×', 'Block beta receptors, lower HR'])
+    for (const s of ['Pharmacology', 'Prelims 2026-12-10', 'Autonomic drugs', 'Beta blockers', 'class ✓', 'revised 2×', 'Block beta receptors, lower HR'])
       expect(out).toContain(s)
   })
 })

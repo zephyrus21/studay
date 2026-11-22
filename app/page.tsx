@@ -9,7 +9,8 @@ import { requireUser, today } from '@/lib/session'
 
 export default async function Home() {
   const user = await requireUser()
-  const [subjects, day] = await Promise.all([getHome(user.id), today()])
+  const day = await today()
+  const subjects = await getHome(user.id, day)
   const first = user.name.trim().split(/\s+/)[0]
   const need = subjects.reduce((n, s) => n + s.unrevised, 0)
   return (

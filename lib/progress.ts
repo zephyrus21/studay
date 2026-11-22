@@ -29,11 +29,12 @@ export function daysUntil(examDate: string, today: string): number {
 export function countdown(
   examDate: string | null,
   today: string,
+  name: string,
 ): { label: string; urgent: boolean; today: boolean } | null {
   if (!examDate) return null;
   const days = daysUntil(examDate, today);
   if (days < 0) return null;
-  const label = days === 0 ? "exam today" : days === 1 ? "exam in 1 day" : `exam in ${days} days`;
+  const label = days === 0 ? `${name} today` : days === 1 ? `${name} in 1 day` : `${name} in ${days} days`;
   return { label, urgent: days <= 7, today: days === 0 };
 }
 

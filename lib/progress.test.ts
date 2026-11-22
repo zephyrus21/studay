@@ -44,21 +44,28 @@ describe("daysUntil", () => {
 
 describe("countdown", () => {
   test("exam today", () => {
-    expect(countdown("2026-11-22", "2026-11-22")).toEqual({ label: "exam today", urgent: true, today: true });
+    expect(countdown("2026-11-22", "2026-11-22", "Final")).toEqual({ label: "Final today", urgent: true, today: true });
   });
 
   test("exam tomorrow", () => {
-    expect(countdown("2026-11-23", "2026-11-22")).toEqual({ label: "exam in 1 day", urgent: true, today: false });
+    expect(countdown("2026-11-23", "2026-11-22", "Final")).toEqual({ label: "Final in 1 day", urgent: true, today: false });
   });
 
   test("exam in N days, urgent only within 7 days", () => {
-    expect(countdown("2026-11-29", "2026-11-22")).toEqual({ label: "exam in 7 days", urgent: true, today: false });
-    expect(countdown("2026-12-10", "2026-11-22")).toEqual({ label: "exam in 18 days", urgent: false, today: false });
+    expect(countdown("2026-11-29", "2026-11-22", "Final")).toEqual({ label: "Final in 7 days", urgent: true, today: false });
+    expect(countdown("2026-12-10", "2026-11-22", "Final")).toEqual({ label: "Final in 18 days", urgent: false, today: false });
+  });
+
+  test("named exam uses the name in the label", () => {
+    expect(countdown("2026-11-22", "2026-11-22", "Prelims")).toEqual({ label: "Prelims today", urgent: true, today: true });
+    expect(countdown("2026-11-23", "2026-11-22", "Prelims")).toEqual({ label: "Prelims in 1 day", urgent: true, today: false });
+    expect(countdown("2026-12-10", "2026-11-22", "Prelims")).toEqual({ label: "Prelims in 18 days", urgent: false, today: false });
+    expect(countdown("2026-11-21", "2026-11-22", "Prelims")).toBeNull();
   });
 
   test("past exam and missing exam return null", () => {
-    expect(countdown("2026-11-21", "2026-11-22")).toBeNull();
-    expect(countdown(null, "2026-11-22")).toBeNull();
+    expect(countdown("2026-11-21", "2026-11-22", "Final")).toBeNull();
+    expect(countdown(null, "2026-11-22", "Final")).toBeNull();
   });
 });
 

@@ -10,6 +10,7 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
   const prefix = `t-${id}-`
   const u1 = `${prefix}u1`
   const u2 = `${prefix}u2`
+  const today = '2026-11-22'
 
   afterAll(async () => {
     await sql`delete from subjects where user_id like ${prefix + '%'}`
@@ -31,10 +32,11 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     expect(tree[0].topics).toHaveLength(1)
     expect(tree[0].topics[0].subtopics).toHaveLength(1)
     expect(tree[0].created_at).toBeInstanceOf(Date)
-    expect(tree[0].exam_date).toBeNull()
-    expect((await d.getHome(user))[0].total).toBe(1)
-    await d.updateSubject(user, sub, { exam_date: '2027-01-05' })
-    expect((await d.getHome(user))[0].exam_date).toBe('2027-01-05')
+    expect(tree[0].exams).toEqual([])
+    expect((await d.getHome(user, today))[0].total).toBe(1)
+    await d.createExam(user, sub, 'Prelims', '2027-01-05')
+    expect((await d.getHome(user, today))[0]).toMatchObject({ exam_name: 'Prelims', exam_date: '2027-01-05' })
+    expect((await d.getTree(user))[0].exams).toEqual([{ name: 'Prelims', date: '2027-01-05' }])
     await sql`delete from subjects where user_id = ${user}`
   })
 
@@ -46,7 +48,7 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     await d.bumpRevision(user, subs[2], 1)
     await d.bumpRevision(user, subs[2], 1)
     const want = { total: 4, done: 2, class_count: 1, self_count: 1, revisions: 2, unrevised: 2 }
-    expect((await d.getHome(user))[0]).toMatchObject(want)
+    expect((await d.getHome(user, today))[0]).toMatchObject(want)
     expect((await d.getSubject(user, sub))!.topics[0]).toMatchObject({ total: 4, done: 2 })
     expect((await d.getTopic(user, top))!.subtopics).toHaveLength(4)
     expect((await d.getSubtopic(user, subs[2]))!.subtopic.revision_count).toBe(2)
@@ -62,13 +64,13 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     expect(await d.getSubject(u2, sub)).toBeNull()
     expect(await d.getTopic(u2, top)).toBeNull()
     expect(await d.getSubtopic(u2, subs[0])).toBeNull()
-    expect(await d.updateSubject(u2, sub, { name: 'x', exam_date: '2030-01-01' })).toBe(false)
+    expect(await d.updateSubject(u2, sub, { name: 'x' })).toBe(false)
     expect(await d.renameTopic(u2, top, 'x')).toBe(false)
     expect(await d.deleteTopic(u2, top)).toBe(false)
     expect(await d.deleteSubtopic(u2, subs[0])).toBe(false)
     const [s1] = (await d.getTree(u1)).filter((s) => s.id === sub)
     expect(s1.name).toBe('Anatomy')
-    expect(s1.exam_date).toBeNull()
+    expect(s1.exams).toEqual([])
     expect(s1.topics).toHaveLength(1)
     expect(s1.topics[0].name).toBe('T')
     expect(s1.topics[0].subtopics).toHaveLength(1)
@@ -108,12 +110,10 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
   test('partial updateSubject', async () => {
     const user = `${u1}-patch`
     const { sub } = await seed(user)
-    const get = async () => (await d.getHome(user))[0]
-    await d.updateSubject(user, sub, { exam_date: '2027-01-05' })
     await d.updateSubject(user, sub, { name: 'Renamed' })
-    expect(await get()).toMatchObject({ name: 'Renamed', exam_date: '2027-01-05', icon: '🫀' })
-    await d.updateSubject(user, sub, { exam_date: null })
-    expect(await get()).toMatchObject({ name: 'Renamed', exam_date: null })
+    expect((await d.getHome(user, today))[0]).toMatchObject({ name: 'Renamed', icon: '🫀' })
+    await d.updateSubject(user, sub, { icon: '🧠' })
+    expect((await d.getHome(user, today))[0]).toMatchObject({ name: 'Renamed', icon: '🧠' })
   })
 
   test('cascade', async () => {
@@ -133,7 +133,7 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     await d.updateSubtopic(user, subs[1], { self_study: true })
     await d.bumpRevision(user, subs[1], 1)
     await d.bumpRevision(user, subs[1], 1)
-    expect((await d.getHome(user))[0]).toMatchObject({ total: 3, class_count: 1, self_count: 2, revised: 1 })
+    expect((await d.getHome(user, today))[0]).toMatchObject({ total: 3, class_count: 1, self_count: 2, revised: 1 })
     expect((await d.getSubject(user, sub))!.topics[0]).toMatchObject({ total: 3, done: 2, class_count: 1, self_count: 2, revised: 1 })
     await sql`delete from subjects where user_id = ${user}`
   })
@@ -145,11 +145,64 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     await d.updateSubtopic(user, subs[1], { self_study: true })
     await d.bumpRevision(user, subs[1], 1)
     await seed(`${u2}-revise`, ['other'])
-    const rows = await d.getRevise(user)
+    const rows = await d.getRevise(user, today)
     expect(rows.map((r) => r.name)).toEqual(['done'])
-    expect(rows[0]).toMatchObject({ topic_name: 'T', subject_name: 'Anatomy', icon: '🫀', exam_date: null })
+    expect(rows[0]).toMatchObject({ topic_name: 'T', subject_name: 'Anatomy', icon: '🫀', exam_date: null, exam_name: null })
     await d.bumpRevision(user, subs[0], 1)
-    expect(await d.getRevise(user)).toEqual([])
+    expect(await d.getRevise(user, today)).toEqual([])
     await sql`delete from subjects where user_id in (${user}, ${`${u2}-revise`})`
+  })
+
+  test('next exam: smallest date >= today, null when all past', async () => {
+    const user = `${u1}-next`
+    const { sub } = await seed(user)
+    await d.createExam(user, sub, 'Old', '2026-11-21')
+    await d.createExam(user, sub, 'Far', '2026-12-02')
+    expect((await d.getHome(user, today))[0]).toMatchObject({ exam_name: 'Far', exam_date: '2026-12-02' })
+    await d.createExam(user, sub, 'Near', '2026-11-25')
+    expect((await d.getHome(user, today))[0]).toMatchObject({ exam_name: 'Near', exam_date: '2026-11-25' })
+    await d.createExam(user, sub, 'Today', today)
+    expect((await d.getHome(user, today))[0]).toMatchObject({ exam_name: 'Today', exam_date: today })
+    expect((await d.getHome(user, '2026-12-03'))[0]).toMatchObject({ exam_name: null, exam_date: null })
+    const done = (await d.createSubtopic(user, (await d.createTopic(user, sub, 'T2'))!, 'x'))!
+    await d.updateSubtopic(user, done, { in_class: true })
+    expect((await d.getRevise(user, today))[0]).toMatchObject({ exam_name: 'Today', exam_date: today })
+  })
+
+  test('getSubject and getTree list exams ordered by date', async () => {
+    const user = `${u1}-order`
+    const { sub } = await seed(user)
+    await d.createExam(user, sub, 'B', '2026-12-02')
+    await d.createExam(user, sub, 'A', '2026-11-21')
+    await d.createExam(user, sub, 'C', '2026-11-25')
+    const r = (await d.getSubject(user, sub))!
+    expect(r.exams.map((e) => e.name)).toEqual(['A', 'C', 'B'])
+    expect(r.exams[0]).toMatchObject({ subject_id: sub, date: '2026-11-21' })
+    expect(r.exams[0].created_at).toBeInstanceOf(Date)
+    expect((await d.getTree(user))[0].exams.map((e) => e.name)).toEqual(['A', 'C', 'B'])
+  })
+
+  test('update/delete exam, scoped to owner', async () => {
+    const { sub } = await seed(u1)
+    const ex = (await d.createExam(u1, sub, 'Mid', '2026-12-02'))!
+    expect(await d.createExam(u2, sub, 'x', '2026-12-02')).toBeNull()
+    expect(await d.updateExam(u2, ex, { name: 'x' })).toBe(false)
+    expect(await d.deleteExam(u2, ex)).toBe(false)
+    expect(await d.updateExam(u1, ex, { name: 'Final' })).toBe(true)
+    expect(await d.updateExam(u1, ex, { date: '2026-12-09' })).toBe(true)
+    const get = async () => (await d.getSubject(u1, sub))!.exams.filter((e) => e.id === ex)
+    expect(await get()).toMatchObject([{ name: 'Final', date: '2026-12-09' }])
+    expect(await d.deleteExam(u1, ex)).toBe(true)
+    expect(await get()).toEqual([])
+    expect(await d.getSubject(u1, sub)).not.toBeNull()
+  })
+
+  test('deleting a subject removes its exams', async () => {
+    const user = `${u1}-examcascade`
+    const { sub } = await seed(user)
+    const ex = (await d.createExam(user, sub, 'E', today))!
+    await d.deleteSubject(user, sub)
+    const [r] = await sql`select count(*)::int as n from exams where id = ${ex}`
+    expect(r.n).toBe(0)
   })
 })

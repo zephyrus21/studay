@@ -1,6 +1,7 @@
 import { sql } from '@/lib/db'
 
-export type Subject = { id: string; name: string; icon: string; exam_date: string | null; created_at: Date }
+export type Subject = { id: string; name: string; icon: string; created_at: Date }
+export type Exam = { id: string; subject_id: string; name: string; date: string; created_at: Date }
 export type Topic = { id: string; subject_id: string; name: string; created_at: Date }
 export type Subtopic = {
   id: string
@@ -14,10 +15,13 @@ export type Subtopic = {
 }
 export type Counts = { total: number; done: number; class_count: number; self_count: number; revisions: number; unrevised: number; revised: number }
 
-// exam_date is cast to text in every select so it is always 'YYYY-MM-DD'.
-export async function getHome(userId: string): Promise<(Subject & Counts)[]> {
+// Exam dates are cast to text in every select so they are always 'YYYY-MM-DD'.
+export async function getHome(
+  userId: string,
+  today: string,
+): Promise<(Subject & Counts & { exam_name: string | null; exam_date: string | null })[]> {
   const rows = await sql`
-    select s.id, s.name, s.icon, s.exam_date::text as exam_date, s.created_at,
+    select s.id, s.name, s.icon, s.created_at, ne.name as exam_name, ne.date::text as exam_date,
       count(st.id)::int as total,
       (count(st.id) filter (where st.in_class or st.self_study))::int as done,
       (count(st.id) filter (where st.in_class))::int as class_count,
@@ -26,17 +30,22 @@ export async function getHome(userId: string): Promise<(Subject & Counts)[]> {
       (count(st.id) filter (where (st.in_class or st.self_study) and st.revision_count = 0))::int as unrevised,
       (count(st.id) filter (where st.revision_count > 0))::int as revised
     from subjects s
+    left join lateral (
+      select e.name, e.date from exams e
+      where e.subject_id = s.id and e.date >= ${today}::date
+      order by e.date, e.created_at limit 1
+    ) ne on true
     left join topics t on t.subject_id = s.id
     left join subtopics st on st.topic_id = t.id
     where s.user_id = ${userId}
-    group by s.id
+    group by s.id, ne.name, ne.date
     order by s.created_at, s.id`
-  return rows as (Subject & Counts)[]
+  return rows as (Subject & Counts & { exam_name: string | null; exam_date: string | null })[]
 }
 
 async function ownedSubject(userId: string, id: string): Promise<Subject | null> {
   const [s] = await sql`
-    select id, name, icon, exam_date::text as exam_date, created_at
+    select id, name, icon, created_at
     from subjects where id::text = ${id} and user_id = ${userId}`
   return (s as Subject) ?? null
 }
@@ -56,7 +65,14 @@ export async function getSubject(userId: string, id: string) {
     where t.subject_id = ${subject.id}
     group by t.id
     order by t.created_at, t.id`
-  return { subject, topics: topics as (Topic & Pick<Counts, 'total' | 'done' | 'class_count' | 'self_count' | 'revised'>)[] }
+  const exams = await sql`
+    select id, subject_id, name, date::text as date, created_at
+    from exams where subject_id = ${subject.id} order by date, created_at, id`
+  return {
+    subject,
+    exams: exams as Exam[],
+    topics: topics as (Topic & Pick<Counts, 'total' | 'done' | 'class_count' | 'self_count' | 'revised'>)[],
+  }
 }
 
 export async function getTopic(userId: string, id: string) {
@@ -87,8 +103,12 @@ export async function getSubtopic(userId: string, id: string) {
 
 export async function getTree(userId: string) {
   const subjects = await sql`
-    select id, name, icon, exam_date::text as exam_date, created_at
+    select id, name, icon, created_at
     from subjects where user_id = ${userId} order by created_at, id`
+  const exams = await sql`
+    select e.subject_id, e.name, e.date::text as date
+    from exams e join subjects s on s.id = e.subject_id
+    where s.user_id = ${userId} order by e.date, e.created_at, e.id`
   const topics = await sql`
     select t.id, t.subject_id, t.name, t.created_at
     from topics t join subjects s on s.id = t.subject_id
@@ -102,6 +122,9 @@ export async function getTree(userId: string) {
     where s.user_id = ${userId} order by st.created_at, st.id`
   return (subjects as Subject[]).map((s) => ({
     ...s,
+    exams: (exams as (Pick<Exam, 'subject_id' | 'name' | 'date'>)[])
+      .filter((e) => e.subject_id === s.id)
+      .map((e) => ({ name: e.name, date: e.date })),
     topics: (topics as Topic[])
       .filter((t) => t.subject_id === s.id)
       .map((t) => ({ ...t, subtopics: (subtopics as Subtopic[]).filter((x) => x.topic_id === t.id) })),
@@ -115,17 +138,23 @@ export type ReviseRow = {
   subject_id: string
   subject_name: string
   icon: string
+  exam_name: string | null
   exam_date: string | null
   subject_created_at: Date
 }
 
-export async function getRevise(userId: string): Promise<ReviseRow[]> {
+export async function getRevise(userId: string, today: string): Promise<ReviseRow[]> {
   const rows = await sql`
     select st.id, st.name, t.name as topic_name, s.id as subject_id, s.name as subject_name, s.icon,
-      s.exam_date::text as exam_date, s.created_at as subject_created_at
+      ne.name as exam_name, ne.date::text as exam_date, s.created_at as subject_created_at
     from subtopics st
     join topics t on t.id = st.topic_id
     join subjects s on s.id = t.subject_id
+    left join lateral (
+      select e.name, e.date from exams e
+      where e.subject_id = s.id and e.date >= ${today}::date
+      order by e.date, e.created_at limit 1
+    ) ne on true
     where s.user_id = ${userId} and (st.in_class or st.self_study) and st.revision_count = 0
     order by s.created_at, s.id, t.created_at, st.created_at`
   return rows as ReviseRow[]
@@ -139,14 +168,12 @@ export async function createSubject(userId: string, name: string, icon: string):
 export async function updateSubject(
   userId: string,
   id: string,
-  patch: { name?: string; icon?: string; exam_date?: string | null },
+  patch: { name?: string; icon?: string },
 ): Promise<boolean> {
-  const hasExam = 'exam_date' in patch
   const r = await sql`
     update subjects set
       name = coalesce(${patch.name ?? null}::text, name),
-      icon = coalesce(${patch.icon ?? null}::text, icon),
-      exam_date = case when ${hasExam}::boolean then ${patch.exam_date ?? null}::date else exam_date end
+      icon = coalesce(${patch.icon ?? null}::text, icon)
     where id::text = ${id} and user_id = ${userId}
     returning id`
   return r.length > 0
@@ -154,6 +181,34 @@ export async function updateSubject(
 
 export async function deleteSubject(userId: string, id: string): Promise<boolean> {
   const r = await sql`delete from subjects where id::text = ${id} and user_id = ${userId} returning id`
+  return r.length > 0
+}
+
+export async function createExam(userId: string, subjectId: string, name: string, date: string): Promise<string | null> {
+  const r = await sql`
+    insert into exams (subject_id, name, date)
+    select id, ${name}, ${date}::date from subjects where id::text = ${subjectId} and user_id = ${userId}
+    returning id`
+  return r[0]?.id ?? null
+}
+
+export async function updateExam(userId: string, id: string, patch: { name?: string; date?: string }): Promise<boolean> {
+  const r = await sql`
+    update exams set
+      name = coalesce(${patch.name ?? null}::text, name),
+      date = coalesce(${patch.date ?? null}::date, date)
+    where id::text = ${id}
+      and exists (select 1 from subjects s where s.id = exams.subject_id and s.user_id = ${userId})
+    returning id`
+  return r.length > 0
+}
+
+export async function deleteExam(userId: string, id: string): Promise<boolean> {
+  const r = await sql`
+    delete from exams
+    where id::text = ${id}
+      and exists (select 1 from subjects s where s.id = exams.subject_id and s.user_id = ${userId})
+    returning id`
   return r.length > 0
 }
 

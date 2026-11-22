@@ -5,7 +5,7 @@ import { SignOut } from '@/components/SignOut'
 import { ChangePassword } from '@/components/ChangePassword'
 import { ThemePicker } from '@/components/ThemePicker'
 import { getHome } from '@/lib/data'
-import { requireUser } from '@/lib/session'
+import { requireUser, today } from '@/lib/session'
 import { themeFrom } from '@/lib/theme'
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -19,7 +19,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 
 export default async function Me() {
   const user = await requireUser()
-  const subjects = await getHome(user.id)
+  const subjects = await getHome(user.id, await today())
   const first = user.name.trim().split(/\s+/)[0]
   const done = subjects.reduce((n, s) => n + s.done, 0)
   const total = subjects.reduce((n, s) => n + s.total, 0)
