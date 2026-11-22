@@ -98,7 +98,7 @@ export default function Ask() {
         ))}
         <div ref={end} className="scroll-mb-40" />
       </div>
-      <form onSubmit={send} className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] flex gap-2 bg-bg pb-2">
+      <form onSubmit={send} className="sticky bottom-[calc(6rem+env(safe-area-inset-bottom))] flex gap-2 bg-bg pb-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}

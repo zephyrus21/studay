@@ -126,6 +126,18 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     expect(r.n).toBe(0)
   })
 
+  test('three-colour counts (class, self, revised = sub-topics with any revision)', async () => {
+    const user = `${u1}-bars`
+    const { sub, subs } = await seed(user, ['a', 'b', 'c'])
+    await d.updateSubtopic(user, subs[0], { in_class: true, self_study: true })
+    await d.updateSubtopic(user, subs[1], { self_study: true })
+    await d.bumpRevision(user, subs[1], 1)
+    await d.bumpRevision(user, subs[1], 1)
+    expect((await d.getHome(user))[0]).toMatchObject({ total: 3, class_count: 1, self_count: 2, revised: 1 })
+    expect((await d.getSubject(user, sub))!.topics[0]).toMatchObject({ total: 3, done: 2, class_count: 1, self_count: 2, revised: 1 })
+    await sql`delete from subjects where user_id = ${user}`
+  })
+
   test('getRevise lists only done, never-revised sub-topics of this user', async () => {
     const user = `${u1}-revise`
     const { subs } = await seed(user, ['done', 'revised', 'untouched'])

@@ -12,7 +12,7 @@ export type Subtopic = {
   revision_count: number
   last_revised_at: Date | null
 }
-export type Counts = { total: number; done: number; class_count: number; self_count: number; revisions: number; unrevised: number }
+export type Counts = { total: number; done: number; class_count: number; self_count: number; revisions: number; unrevised: number; revised: number }
 
 // exam_date is cast to text in every select so it is always 'YYYY-MM-DD'.
 export async function getHome(userId: string): Promise<(Subject & Counts)[]> {
@@ -23,7 +23,8 @@ export async function getHome(userId: string): Promise<(Subject & Counts)[]> {
       (count(st.id) filter (where st.in_class))::int as class_count,
       (count(st.id) filter (where st.self_study))::int as self_count,
       coalesce(sum(st.revision_count), 0)::int as revisions,
-      (count(st.id) filter (where (st.in_class or st.self_study) and st.revision_count = 0))::int as unrevised
+      (count(st.id) filter (where (st.in_class or st.self_study) and st.revision_count = 0))::int as unrevised,
+      (count(st.id) filter (where st.revision_count > 0))::int as revised
     from subjects s
     left join topics t on t.subject_id = s.id
     left join subtopics st on st.topic_id = t.id
@@ -46,13 +47,16 @@ export async function getSubject(userId: string, id: string) {
   const topics = await sql`
     select t.id, t.subject_id, t.name, t.created_at,
       count(st.id)::int as total,
-      (count(st.id) filter (where st.in_class or st.self_study))::int as done
+      (count(st.id) filter (where st.in_class or st.self_study))::int as done,
+      (count(st.id) filter (where st.in_class))::int as class_count,
+      (count(st.id) filter (where st.self_study))::int as self_count,
+      (count(st.id) filter (where st.revision_count > 0))::int as revised
     from topics t
     left join subtopics st on st.topic_id = t.id
     where t.subject_id = ${subject.id}
     group by t.id
     order by t.created_at, t.id`
-  return { subject, topics: topics as (Topic & Pick<Counts, 'total' | 'done'>)[] }
+  return { subject, topics: topics as (Topic & Pick<Counts, 'total' | 'done' | 'class_count' | 'self_count' | 'revised'>)[] }
 }
 
 export async function getTopic(userId: string, id: string) {

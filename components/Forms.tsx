@@ -66,7 +66,7 @@ export function AddForm({ kind, parentId }: { kind: Kind; parentId?: string }) {
           type="button"
           onClick={open}
           aria-label={`Add ${kind === 'subtopic' ? 'sub-topic' : kind}`}
-          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-12 min-w-12 place-items-center rounded-2xl bg-brand text-3xl text-on-accent shadow-fab"
+          className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-12 min-w-12 place-items-center rounded-2xl bg-brand text-3xl text-on-accent shadow-fab"
         >
           +
         </button>
