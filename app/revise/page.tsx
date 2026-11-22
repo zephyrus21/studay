@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import { PartyPopper } from 'lucide-react'
 import { Mochi } from '@/components/Mochi'
+import { CountdownIcon, SubjectIcon } from '@/components/SubjectIcon'
 import { PageHeader } from '@/components/PageHeader'
 import { ReviseButton } from '@/components/ReviseButton'
 import { getRevise } from '@/lib/data'
@@ -23,18 +25,20 @@ export default async function Revise() {
       {sorted.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <Mochi size={96} />
-          <p className="font-bold">All caught up! 🎉</p>
+          <PartyPopper size={40} aria-hidden />
+          <p className="font-bold">All caught up!</p>
         </div>
       ) : (
         sorted.map((g) => {
           const cd = countdown(g.exam_date, day)
           return (
             <section key={g.id} className="space-y-1.5">
-              <h2 className="px-1 text-xs font-bold uppercase opacity-65">
-                {g.icon} {g.name}
-                {cd && ` · ${cd.label}`}
+              <h2 className="flex flex-wrap items-center gap-1 px-1 text-xs font-bold uppercase opacity-65">
+                <SubjectIcon icon={g.icon} size={14} />
+                {g.name}
+                {cd && <><span aria-hidden="true" className="px-0.5">·</span><CountdownIcon today={cd.today} size={12} />{cd.label}</>}
               </h2>
-              <div className="divide-y divide-line rounded-[20px] bg-card px-3.5 shadow-[0_2px_10px_rgba(224,122,146,0.12)]">
+              <div className="divide-y divide-line rounded-[20px] bg-card px-3.5 shadow-card">
                 {g.rows.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2 py-2.5">
                     <Link href={`/n/${r.id}`} className="min-w-0 flex-1">

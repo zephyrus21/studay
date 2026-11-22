@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { CalendarDays } from 'lucide-react'
 import { ICONS } from '@/lib/icons'
+import { SUBJECT_LABELS, SubjectIcon } from '@/components/SubjectIcon'
 import { useRouter } from 'next/navigation'
 import { Sheet } from '@/components/Sheet'
 import { createSubject, createTopic, createSubtopic, deleteSubject, deleteSubtopic, deleteTopic, renameTopic, updateSubject, updateSubtopic } from '@/app/actions'
@@ -9,7 +11,7 @@ import { createSubject, createTopic, createSubtopic, deleteSubject, deleteSubtop
 const del = { subject: deleteSubject, topic: deleteTopic, subtopic: deleteSubtopic }
 
 const input = 'block min-h-11 w-full rounded-full border-[1.5px] border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
-const btn = 'min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50'
+const btn = 'min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50'
 
 const TITLE = { subject: 'New subject', topic: 'New topic', subtopic: 'New sub-topic' }
 
@@ -40,11 +42,12 @@ function AddBody({ kind, parentId, close }: { kind: Kind; parentId?: string; clo
             <button
               key={i}
               type="button"
+              aria-label={SUBJECT_LABELS[i]}
               aria-pressed={icon === i}
               onClick={() => setIcon(i)}
-              className={`grid h-11 w-11 place-items-center rounded-[10px] text-lg ${icon === i ? 'bg-accent' : 'bg-chip'}`}
+              className={`grid h-11 w-11 place-items-center rounded-[10px] ${icon === i ? 'bg-accent text-on-accent' : 'bg-chip'}`}
             >
-              {i}
+              <SubjectIcon icon={i} size={20} />
             </button>
           ))}
         </div>
@@ -63,7 +66,7 @@ export function AddForm({ kind, parentId }: { kind: Kind; parentId?: string }) {
           type="button"
           onClick={open}
           aria-label={`Add ${kind === 'subtopic' ? 'sub-topic' : kind}`}
-          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-12 min-w-12 place-items-center rounded-2xl bg-brand text-3xl text-white shadow-[0_6px_16px_rgba(224,122,146,0.45)]"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-12 min-w-12 place-items-center rounded-2xl bg-brand text-3xl text-on-accent shadow-fab"
         >
           +
         </button>
@@ -141,7 +144,7 @@ export function ExamDate({ id, value }: { id: string; value: string | null }) {
     })
   return (
     <div className={`flex flex-wrap items-center gap-2 ${pending ? 'opacity-60' : ''}`}>
-      <label className="text-sm font-bold" htmlFor="exam">🗓 Exam date</label>
+      <label className="inline-flex items-center gap-1 text-sm font-bold" htmlFor="exam"><CalendarDays size={16} aria-hidden />Exam date</label>
       <input id="exam" type="date" key={value ?? ''} defaultValue={value ?? ''} onChange={(e) => e.target.value && set(e.target.value)} className="rounded-full border-[1.5px] border-line bg-card px-3 py-1.5 text-sm" />
       {value && (
         <button type="button" onClick={() => set(null)} className="rounded-full px-2 py-1 text-xs font-bold text-brand">

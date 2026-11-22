@@ -31,7 +31,7 @@ export default function SignIn() {
     } else {
       const { error } = await authClient.signIn.email({ email, password })
       if (error) {
-        setError('Wrong email or password 🐾')
+        setError('Wrong email or password')
         setBusy(false)
         return
       }
@@ -81,7 +81,7 @@ export default function SignIn() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-xl bg-accent px-6 py-3 font-bold disabled:opacity-50"
+          className="rounded-xl bg-accent px-6 py-3 font-bold text-on-accent disabled:opacity-50"
         >
           {firstTime ? 'Set password' : 'Sign in'}
         </button>

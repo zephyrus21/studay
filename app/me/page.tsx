@@ -1,3 +1,4 @@
+import { Stethoscope } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { SignOut } from '@/components/SignOut'
 import { getHome } from '@/lib/data'
@@ -22,12 +23,12 @@ export default async function Me() {
   return (
     <main className="mx-auto w-full max-w-md space-y-3 px-4 pb-16">
       <PageHeader title="Me" />
-      <div className="flex flex-col items-center gap-1 rounded-[20px] bg-card p-5 text-center shadow-[0_2px_10px_rgba(224,122,146,0.12)]">
-        <span className="text-4xl">🩺</span>
+      <div className="flex flex-col items-center gap-1 rounded-[20px] bg-card p-5 text-center shadow-card">
+        <Stethoscope size={40} aria-hidden />
         <p className="text-lg font-black">{first ? `Dr. ${first}` : 'Doctor'}</p>
         <p className="break-all text-sm opacity-65">{user.email}</p>
       </div>
-      <div className="divide-y divide-line rounded-[20px] bg-card px-3.5 shadow-[0_2px_10px_rgba(224,122,146,0.12)]">
+      <div className="divide-y divide-line rounded-[20px] bg-card px-3.5 shadow-card">
         <Stat label="Subjects" value={subjects.length} />
         <Stat label="Sub-topics done" value={`${done} / ${total}`} />
         <Stat label="Revisions logged" value={revisions} />

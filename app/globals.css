@@ -8,7 +8,42 @@
   --color-accent: #EF8FA3;
   --color-chip: #FDE8EC;
   --color-brand: #E07A92;
+  --color-on-accent: #3B2328;
   --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Shadows are plain variables (not @theme) so the dark override reaches the utilities. */
+:root {
+  color-scheme: light dark;
+  --shadow-card: 0 2px 10px rgba(224,122,146,0.12);
+  --shadow-nav: 0 6px 22px rgba(90,62,68,0.16);
+  --shadow-fab: 0 6px 16px rgba(224,122,146,0.45);
+}
+
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+@utility shadow-nav {
+  box-shadow: var(--shadow-nav);
+}
+
+@utility shadow-fab {
+  box-shadow: var(--shadow-fab);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1E1A1C;
+    --color-card: #2A2427;
+    --color-ink: #F3E6E8;
+    --color-line: #3E3338;
+    --color-chip: #3A2A31;
+    --color-brand: #F29BB0;
+    --shadow-card: 0 2px 10px rgba(0,0,0,0.35);
+    --shadow-nav: 0 6px 22px rgba(0,0,0,0.5);
+    --shadow-fab: 0 6px 16px rgba(0,0,0,0.5);
+  }
 }
 
 body {

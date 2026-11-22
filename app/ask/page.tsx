@@ -1,15 +1,16 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { BookOpen } from 'lucide-react'
 import { Markdown } from '@/components/Markdown'
 import { Mochi } from '@/components/Mochi'
 import { PageHeader } from '@/components/PageHeader'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-const YARN = 'Mochi tripped over the yarn, try again 🧶'
+const YARN = 'Mochi tripped over the yarn, try again'
 const BEYOND = '📚 Beyond your notes'
 
-// Pull "📚 Beyond your notes" lines out as a small label, render the rest as markdown.
+// Pull the "Beyond your notes" marker lines out as a small label, render the rest as markdown.
 function Answer({ text }: { text: string }) {
   const parts = text.split(/^(?=📚 Beyond your notes)/m)
   return (
@@ -17,7 +18,7 @@ function Answer({ text }: { text: string }) {
       {parts.map((p, i) =>
         p.startsWith(BEYOND) ? (
           <div key={i}>
-            <span className="inline-block rounded-full bg-chip px-2 py-0.5 text-xs font-bold text-brand">{BEYOND}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-chip px-2 py-0.5 text-xs font-bold text-brand"><BookOpen size={14} aria-hidden />Beyond your notes</span>
             <Markdown text={p.slice(BEYOND.length).replace(/^[\s:—-]+/, '')} />
           </div>
         ) : (
@@ -82,14 +83,14 @@ export default function Ask() {
         }
       />
       <div className="flex-1 space-y-2">
-        {msgs.length === 0 && <p className="py-6 text-center text-sm opacity-75">Ask about your notes, e.g. “What haven&apos;t I revised?” 🐾</p>}
+        {msgs.length === 0 && <p className="py-6 text-center text-sm opacity-75">Ask about your notes, e.g. “What haven&apos;t I revised?”</p>}
         {msgs.map((m, i) => (
           <div
             key={i}
             className={
               m.role === 'user'
-                ? 'ml-8 rounded-[14px] bg-accent px-3 py-2 text-sm'
-                : 'mr-8 rounded-[20px] bg-card px-3 py-2 shadow-[0_2px_10px_rgba(224,122,146,0.12)]'
+                ? 'ml-8 rounded-[14px] bg-accent px-3 py-2 text-sm text-on-accent'
+                : 'mr-8 rounded-[20px] bg-card px-3 py-2 shadow-card'
             }
           >
             {m.role === 'user' ? m.content : m.content ? <Answer text={m.content} /> : <span className="text-sm opacity-60">Mochi is thinking…</span>}
@@ -106,7 +107,7 @@ export default function Ask() {
           aria-label="Ask Mochi"
           className="min-h-11 min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-card px-4 py-2 text-sm"
         />
-        <button disabled={busy || !input.trim()} className="min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold disabled:opacity-50">
+        <button disabled={busy || !input.trim()} className="min-h-11 rounded-full bg-accent px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50">
           Send
         </button>
       </form>

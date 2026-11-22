@@ -44,16 +44,16 @@ describe("daysUntil", () => {
 
 describe("countdown", () => {
   test("exam today", () => {
-    expect(countdown("2026-11-22", "2026-11-22")).toEqual({ label: "exam today 🍀", urgent: true });
+    expect(countdown("2026-11-22", "2026-11-22")).toEqual({ label: "exam today", urgent: true, today: true });
   });
 
   test("exam tomorrow", () => {
-    expect(countdown("2026-11-23", "2026-11-22")).toEqual({ label: "🗓 exam in 1 day", urgent: true });
+    expect(countdown("2026-11-23", "2026-11-22")).toEqual({ label: "exam in 1 day", urgent: true, today: false });
   });
 
   test("exam in N days, urgent only within 7 days", () => {
-    expect(countdown("2026-11-29", "2026-11-22")).toEqual({ label: "🗓 exam in 7 days", urgent: true });
-    expect(countdown("2026-12-10", "2026-11-22")).toEqual({ label: "🗓 exam in 18 days", urgent: false });
+    expect(countdown("2026-11-29", "2026-11-22")).toEqual({ label: "exam in 7 days", urgent: true, today: false });
+    expect(countdown("2026-12-10", "2026-11-22")).toEqual({ label: "exam in 18 days", urgent: false, today: false });
   });
 
   test("past exam and missing exam return null", () => {

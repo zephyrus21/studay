@@ -6,8 +6,8 @@ import { takeQuota } from '@/lib/usage'
 
 export const maxDuration = 60
 
-const REFUSAL = "Mochi can't help with that one 🐾"
-const TRIPPED = 'Mochi tripped over the yarn, try again 🧶'
+const REFUSAL = "Mochi can't help with that one"
+const TRIPPED = 'Mochi tripped over the yarn, try again'
 
 function validMessages(body: unknown): ChatMessage[] | null {
   const m = (body as { messages?: unknown } | null)?.messages
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   const day = await today()
   if (!(await takeQuota(user.id, day)))
-    return Response.json({ error: 'Mochi needs a nap — 30 questions a day. Back tomorrow! 🐾' }, { status: 429 })
+    return Response.json({ error: 'Mochi needs a nap — 30 questions a day. Back tomorrow!' }, { status: 429 })
 
   const tree = await getTree(user.id)
   const enc = new TextEncoder()

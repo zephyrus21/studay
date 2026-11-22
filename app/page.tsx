@@ -1,3 +1,4 @@
+import { Stethoscope } from 'lucide-react'
 import { Mochi } from '@/components/Mochi'
 import { SubjectCard } from '@/components/SubjectCard'
 import { PageHeader } from '@/components/PageHeader'
@@ -21,7 +22,7 @@ export default async function Home() {
           </span>
         }
       />
-      {need > 0 && <p className="text-sm opacity-75">{need} {need === 1 ? 'topic needs' : 'topics need'} revision 🩺</p>}
+      {need > 0 && <p className="text-sm opacity-75">{need} {need === 1 ? 'topic needs' : 'topics need'} revision <Stethoscope size={14} aria-hidden className="inline align-middle" /></p>}
       {subjects.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <Mochi size={96} />

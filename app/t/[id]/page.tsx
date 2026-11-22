@@ -18,7 +18,7 @@ export default async function TopicPage({ params }: PageProps<'/t/[id]'>) {
     <main className="mx-auto w-full max-w-md space-y-3 px-4 pb-16">
       <PageHeader back={{ href: `/s/${subject.id}`, label: subject.name }} title={topic.name} />
       {subtopics.map((st) => (
-        <div key={st.id} className="space-y-2 rounded-[20px] bg-card p-3.5 shadow-[0_2px_10px_rgba(224,122,146,0.12)]">
+        <div key={st.id} className="space-y-2 rounded-[20px] bg-card p-3.5 shadow-card">
           <div className="flex items-center justify-between gap-2 font-bold">
             <Link href={`/n/${st.id}`} className="min-w-0 flex-1 truncate py-2">{st.name}</Link>
             <span className="shrink-0"><RevisionStamp count={st.revision_count} done={isDone(st)} /></span>
