@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { ClipboardList } from 'lucide-react'
 import { addTodoFromChat } from '@/app/actions'
-import { fmt, KIND, TimePriority } from '@/components/Todos'
+import { DurationPill, fmt, KIND, KindPill, PriorityPill, Rail } from '@/components/Todos'
 import type { Proposal } from '@/lib/proposal'
 import { PRIORITY } from '@/lib/todo-time'
 
@@ -20,13 +19,14 @@ export function TodoProposal({ p }: { p: Proposal }) {
   const [state, setState] = useState<State>('idle')
   const [err, setErr] = useState('')
   if (state === 'dismissed') return null
-  const { label, Icon } = KIND[p.kind]
+  const { label } = KIND[p.kind]
   const name = `${p.subtopic_name}, ${label}, ${fmt(p.due)}`
+  const priority = PRIORITY[p.priority ?? 'medium']
   const add = async () => {
     setState('pending')
     setErr('')
     try {
-      const r = await addTodoFromChat(p.subtopic_id, p.kind, p.due, p.start ?? null, p.end ?? null, PRIORITY[p.priority ?? 'medium'])
+      const r = await addTodoFromChat(p.subtopic_id, p.kind, p.due, p.start ?? null, p.end ?? null, priority)
       if (!r.error) setState('added')
       else if (r.code) setState(r.code)
       else {
@@ -40,21 +40,18 @@ export function TodoProposal({ p }: { p: Proposal }) {
   }
   return (
     <div className="mt-2 rounded-[14px] border-[1.5px] border-line bg-bg p-3">
-      <div className="flex items-start gap-2">
-        <ClipboardList size={18} aria-hidden className="mt-0.5 shrink-0 text-brand" />
+      <div className="flex items-center gap-3">
+        <Rail todo={{ due: p.due, start_time: p.start ?? null }} late={false} dayRail faded={false} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold" title={p.subtopic_name}>
+          <p className="truncate font-bold" title={p.subtopic_name}>
             {p.subtopic_name}
           </p>
           <p className="truncate text-xs opacity-60">{p.topic_name}</p>
-          <p className="flex flex-wrap items-center gap-1.5 text-xs opacity-75">
-            <span className="inline-flex items-center gap-1 rounded-full bg-chip px-2 py-0.5 text-[11px] font-bold">
-              <Icon size={12} aria-hidden />
-              {label}
-            </span>
-            <span>{fmt(p.due)}</span>
-            <TimePriority start={p.start} end={p.end} priority={PRIORITY[p.priority ?? 'medium']} />
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs">
+            <KindPill kind={p.kind} />
+            <DurationPill start={p.start ?? null} end={p.end ?? null} />
+            <PriorityPill priority={priority} />
+          </div>
         </div>
       </div>
       {state === 'added' ? (

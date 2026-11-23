@@ -24,3 +24,21 @@ export function fmtTime(start: string, end?: string | null): string {
   const b = parts(end)
   return a.ap === b.ap ? `${a.clock} – ${b.clock} ${b.ap}` : `${a.clock} ${a.ap} – ${b.clock} ${b.ap}`
 }
+
+const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
+
+export function fmtDuration(start: string | null, end: string | null): string | null {
+  if (!start || !end) return null
+  const m = mins(end) - mins(start)
+  if (m <= 0) return null
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  return h && r ? `${h}h ${r}m` : h ? `${h}h` : `${r}m`
+}
+
+// Not done in time: an earlier day, or today once the end (or start, if no end) has passed.
+export function isLate(due: string, start: string | null, end: string | null, today: string, now: string): boolean {
+  if (due !== today) return due < today
+  const deadline = end ?? start
+  return !!deadline && now >= deadline
+}

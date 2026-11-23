@@ -1,16 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useTransition } from 'react'
-import { Check, ChevronDown, Clock, Flag, House, Repeat, School, type LucideIcon, X } from 'lucide-react'
+import { useEffect, useState, useTransition } from 'react'
+import { AlarmClock, Check, ChevronDown, Flag, House, Repeat, School, Timer, type LucideIcon, X } from 'lucide-react'
 import { addTodo, editTodo, removeTodo, toggleTodo } from '@/app/actions'
 import { btn, input } from '@/components/Forms'
 import { Mochi } from '@/components/Mochi'
 import { Sheet } from '@/components/Sheet'
 import type { getPickList, TodoKind, TodoRow } from '@/lib/data'
-import { fmtTime, PRIORITY } from '@/lib/todo-time'
+import { fmtDuration, fmtTime, isLate, PRIORITY } from '@/lib/todo-time'
 
 type Pick = Awaited<ReturnType<typeof getPickList>>[number]
+type Clock = { today: string; now: string }
+const pad = (n: number) => String(n).padStart(2, '0')
 
 export const KIND: Record<TodoKind, { label: string; Icon: LucideIcon }> = {
   class: { label: 'Class', Icon: School },
@@ -33,27 +35,6 @@ const PRIOS: { key: Prio; label: string }[] = [
   { key: 'low', label: 'Low' },
 ]
 const PRIO_OF: Record<1 | 2 | 3, Prio> = { 1: 'high', 2: 'medium', 3: 'low' }
-
-// Time text plus priority badge; Medium with no time shows nothing.
-export function TimePriority({ start, end, priority }: { start?: string | null; end?: string | null; priority: 1 | 2 | 3 }) {
-  return (
-    <>
-      {start && (
-        <span className="inline-flex shrink-0 items-center gap-1">
-          <Clock size={12} aria-hidden />
-          {fmtTime(start, end)}
-        </span>
-      )}
-      {priority === PRIORITY.high && (
-        <span className="inline-flex shrink-0 items-center gap-1 font-bold text-brand">
-          <Flag size={12} aria-hidden />
-          High
-        </span>
-      )}
-      {priority === PRIORITY.low && <span className="shrink-0 font-bold">Low</span>}
-    </>
-  )
-}
 
 function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -87,7 +68,29 @@ function PriorityPicker({ value, onChange }: { value: Prio; onChange: (p: Prio) 
   )
 }
 
-export function Todos({ todos, picks, today }: { todos: TodoRow[]; picks: Pick[]; today: string }) {
+export function Todos({ todos, picks, today: serverToday }: { todos: TodoRow[]; picks: Pick[]; today: string }) {
+  // Server render and first client render use the server date and no time, so nothing is late today yet.
+  const [live, setLive] = useState<Clock | null>(null)
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date()
+      const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      const now = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+      setLive((p) => (p && p.today === today && p.now === now ? p : { today, now }))
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    tick()
+    const id = setInterval(tick, 60_000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+  const clock = live ?? { today: serverToday, now: '' }
+  const today = clock.today
   const tomorrow = addDays(today, 1)
   const open = todos.filter((t) => !t.done_at)
   const later = open.filter((t) => t.due > tomorrow)
@@ -104,12 +107,12 @@ export function Todos({ todos, picks, today }: { todos: TodoRow[]; picks: Pick[]
           <p className="font-bold">Nothing planned yet</p>
         </div>
       )}
-      <List title="Overdue" tone="text-brand" list={open.filter((t) => t.due < today)} />
-      <List title="Today" list={open.filter((t) => t.due === today)} />
-      <List title="Tomorrow" list={open.filter((t) => t.due === tomorrow)} />
+      <List title="Overdue" tone="text-brand" list={open.filter((t) => t.due < today)} clock={clock} dayRail />
+      <List title="Today" list={open.filter((t) => t.due === today)} clock={clock} />
+      <List title="Tomorrow" list={open.filter((t) => t.due === tomorrow)} clock={clock} />
       {laterDates.length > 0 && <h2 className="px-1 text-[11px] font-bold uppercase opacity-65">Later</h2>}
       {laterDates.map((d) => (
-        <List key={d} title={fmt(d)} list={later.filter((t) => t.due === d)} />
+        <List key={d} title={fmt(d)} list={later.filter((t) => t.due === d)} clock={clock} />
       ))}
       {done.length > 0 && (
         <details className="group rounded-[20px] bg-card px-3.5 shadow-card">
@@ -120,7 +123,7 @@ export function Todos({ todos, picks, today }: { todos: TodoRow[]; picks: Pick[]
             <ChevronDown size={16} aria-hidden className="transition-transform group-open:rotate-180" />
           </summary>
           <ul className="divide-y divide-line pb-1.5">
-            {done.map((t) => <TodoItem key={t.id} todo={t} />)}
+            {done.map((t) => <TodoItem key={t.id} todo={t} clock={clock} />)}
           </ul>
         </details>
       )}
@@ -143,26 +146,100 @@ export function Todos({ todos, picks, today }: { todos: TodoRow[]; picks: Pick[]
   )
 }
 
-function List({ title, tone, list }: { title: string; tone?: string; list: TodoRow[] }) {
+function List({ title, tone, list, clock, dayRail }: { title: string; tone?: string; list: TodoRow[]; clock: Clock; dayRail?: boolean }) {
   if (list.length === 0) return null
   return (
     <section className="space-y-1">
       <h2 className={`px-1 text-[11px] font-bold uppercase ${tone ?? 'opacity-65'}`}>{title}</h2>
       <ul className="divide-y divide-line rounded-[20px] bg-card px-3.5 shadow-card">
-        {list.map((t) => <TodoItem key={t.id} todo={t} />)}
+        {list.map((t) => <TodoItem key={t.id} todo={t} clock={clock} dayRail={dayRail} />)}
       </ul>
     </section>
   )
 }
 
-function TodoItem({ todo }: { todo: TodoRow }) {
+const pill = 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold'
+
+export function KindPill({ kind }: { kind: TodoKind }) {
+  const { label, Icon } = KIND[kind]
+  return (
+    <span className={`${pill} bg-chip`}>
+      <Icon size={12} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
+export function DurationPill({ start, end }: { start: string | null; end: string | null }) {
+  const duration = fmtDuration(start, end)
+  if (!duration) return null
+  return (
+    <span className={`${pill} bg-chip`}>
+      <Timer size={12} aria-hidden />
+      {duration}
+    </span>
+  )
+}
+
+export function PriorityPill({ priority }: { priority: 1 | 2 | 3 }) {
+  if (priority === PRIORITY.high)
+    return (
+      <span className={`${pill} bg-brand text-on-accent`}>
+        <Flag size={12} aria-hidden />
+        High
+      </span>
+    )
+  if (priority === PRIORITY.low) return <span className={`${pill} border-[1.5px] border-current`}>Low</span>
+  return null
+}
+
+// Left time rail: start time, or the day in the Overdue section, or a faded dash for untimed.
+export function Rail({ todo, late, dayRail, faded }: { todo: { due: string; start_time: string | null }; late: boolean; dayRail: boolean; faded: boolean }) {
+  const timed = todo.start_time !== null
+  const untimed = !timed && !dayRail
+  // Overdue section: the day, then the start time when there is one.
+  const d = new Date(todo.due + 'T00:00:00Z')
+  // Weekday and day number on separate lines so the rail never wraps unevenly ("Tue 24" vs "Wed / 25").
+  const day = dayRail
+    ? { wd: d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }), n: d.getUTCDate() }
+    : null
+  const time = timed ? fmtTime(todo.start_time!) : null
+  const border = untimed ? 'border-transparent' : late ? 'border-brand' : 'border-line'
+  return (
+    <div className={`w-[52px] shrink-0 self-stretch border-r-2 pr-2 text-right ${border} ${faded || untimed ? 'opacity-70' : ''}`}>
+      {untimed ? (
+        <>
+          <b aria-hidden className="block text-[13px]">—</b>
+          <span aria-hidden className="block text-[10px]">any time</span>
+          <span className="sr-only">No set time</span>
+        </>
+      ) : (
+        <>
+          {day ? (
+            <b className={`block text-[13px] leading-tight ${late ? 'text-brand' : ''}`}>
+              <span className="block">{day.wd}</span>
+              <span className="block">{day.n}</span>
+            </b>
+          ) : (
+            <b className={`block text-[13px] ${late ? 'text-brand' : ''}`}>{time!.split(' ')[0]}</b>
+          )}
+          {(time || !day) && <span className={`block text-[10px] ${late ? 'text-brand' : 'opacity-60'}`}>{day ? time : time!.split(' ')[1]}</span>}
+        </>
+      )}
+    </div>
+  )
+}
+
+function TodoItem({ todo, clock, dayRail = false }: { todo: TodoRow; clock: Clock; dayRail?: boolean }) {
   const [failed, setFailed] = useState(false)
   const [pending, start] = useTransition()
   const isDone = !!todo.done_at
-  const { label, Icon } = KIND[todo.kind]
+  const late = !isDone && isLate(todo.due, todo.start_time, todo.end_time, clock.today, clock.now)
+  const { label } = KIND[todo.kind]
   return (
     <li className="py-2">
       <div className="flex items-center gap-3">
+        <Rail todo={todo} late={late} dayRail={dayRail} faded={isDone} />
         <button
           type="button"
           role="checkbox"
@@ -187,14 +264,18 @@ function TodoItem({ todo }: { todo: TodoRow }) {
           <p className={`truncate font-bold ${isDone ? 'line-through' : todo.priority === PRIORITY.low ? 'opacity-70' : ''}`}>
             <Link href={`/n/${todo.subtopic_id}`} className="hover:underline">{todo.subtopic_name}</Link>
           </p>
-          <p className="flex items-center gap-1.5 text-xs opacity-75">
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-chip px-2 py-0.5 text-[11px] font-bold">
-              <Icon size={12} aria-hidden />
-              {label}
-            </span>
-            <TimePriority start={todo.start_time} end={todo.end_time} priority={todo.priority} />
-            <span className="min-w-0 truncate">{todo.subject_name} › {todo.topic_name}</span>
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs">
+            <KindPill kind={todo.kind} />
+            <DurationPill start={todo.start_time} end={todo.end_time} />
+            <PriorityPill priority={todo.priority} />
+            {late && (
+              <span className={`${pill} border-[1.2px] border-brand bg-transparent text-brand`}>
+                <AlarmClock size={12} aria-hidden />
+                Overdue
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 truncate text-xs opacity-75">{todo.subject_name} › {todo.topic_name}</p>
         </div>
         <TodoMenu todo={todo} />
       </div>
