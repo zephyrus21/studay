@@ -79,3 +79,15 @@ body {
 input, textarea, select {
   font-size: max(16px, 1em);
 }
+
+/* iOS Safari gives native date/time inputs an intrinsic min-width, so they overflow
+   their container (and overlap neighbours) instead of fitting w-full. */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+input::-webkit-date-and-time-value {
+  text-align: left;
+}

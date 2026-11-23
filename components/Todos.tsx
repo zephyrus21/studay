@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Check, ChevronDown, Clock, Flag, House, Repeat, School, type LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, Clock, Flag, House, Repeat, School, type LucideIcon, X } from 'lucide-react'
 import { addTodo, editTodo, removeTodo, toggleTodo } from '@/app/actions'
 import { btn, input } from '@/components/Forms'
 import { Mochi } from '@/components/Mochi'
@@ -57,13 +57,13 @@ export function TimePriority({ start, end, priority }: { start?: string | null; 
 
 function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex min-w-0 flex-1 items-end gap-1">
-      <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-bold">
-        {label}
+    <div className="flex min-w-0 items-center gap-1">
+      <label className="flex min-w-0 flex-1 items-center gap-2 text-xs font-bold">
+        <span className="w-9 shrink-0">{label}</span>
         <input type="time" value={value} onChange={(e) => onChange(e.target.value)} className={input} />
       </label>
-      <button type="button" onClick={() => onChange('')} aria-label={`Clear ${label.toLowerCase()} time`} disabled={!value} className="min-h-11 shrink-0 px-1 text-sm font-bold text-brand disabled:opacity-50">
-        Clear
+      <button type="button" onClick={() => onChange('')} aria-label={`Clear ${label.toLowerCase()} time`} disabled={!value} className="grid min-h-11 min-w-9 shrink-0 place-items-center text-brand disabled:opacity-40">
+        <X size={18} aria-hidden />
       </button>
     </div>
   )
@@ -246,7 +246,7 @@ function TodoEditBody({ todo, close }: { todo: TodoRow; close: () => void }) {
         }}
       >
         <input required type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due date" className={input} />
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <TimeField label="Start" value={startTime} onChange={setStartTime} />
           <TimeField label="End" value={endTime} onChange={setEndTime} />
         </div>
@@ -355,7 +355,7 @@ function AddBody({ picks, today, close }: { picks: Pick[]; today: string; close:
             })}
           </div>
           <input required type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due date" className={input} />
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <TimeField label="Start" value={startTime} onChange={setStartTime} />
             <TimeField label="End" value={endTime} onChange={setEndTime} />
           </div>
