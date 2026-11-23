@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Check, ChevronDown, House, Repeat, School, type LucideIcon } from 'lucide-react'
-import { addTodo, moveTodo, removeTodo, toggleTodo } from '@/app/actions'
+import { Check, ChevronDown, Clock, Flag, House, Repeat, School, type LucideIcon } from 'lucide-react'
+import { addTodo, editTodo, removeTodo, toggleTodo } from '@/app/actions'
 import { btn, input } from '@/components/Forms'
 import { Mochi } from '@/components/Mochi'
 import { Sheet } from '@/components/Sheet'
 import type { getPickList, TodoKind, TodoRow } from '@/lib/data'
+import { fmtTime, PRIORITY } from '@/lib/todo-time'
 
 type Pick = Awaited<ReturnType<typeof getPickList>>[number]
 
@@ -24,6 +25,67 @@ const addDays = (d: string, n: number) => {
   return x.toISOString().slice(0, 10)
 }
 const failMsg = <p role="alert" className="text-sm text-brand">Something went wrong, try again</p>
+
+type Prio = keyof typeof PRIORITY
+const PRIOS: { key: Prio; label: string }[] = [
+  { key: 'high', label: 'High' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'low', label: 'Low' },
+]
+const PRIO_OF: Record<1 | 2 | 3, Prio> = { 1: 'high', 2: 'medium', 3: 'low' }
+
+// Time text plus priority badge; Medium with no time shows nothing.
+export function TimePriority({ start, end, priority }: { start?: string | null; end?: string | null; priority: 1 | 2 | 3 }) {
+  return (
+    <>
+      {start && (
+        <span className="inline-flex shrink-0 items-center gap-1">
+          <Clock size={12} aria-hidden />
+          {fmtTime(start, end)}
+        </span>
+      )}
+      {priority === PRIORITY.high && (
+        <span className="inline-flex shrink-0 items-center gap-1 font-bold text-brand">
+          <Flag size={12} aria-hidden />
+          High
+        </span>
+      )}
+      {priority === PRIORITY.low && <span className="shrink-0 font-bold">Low</span>}
+    </>
+  )
+}
+
+function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-end gap-1">
+      <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-bold">
+        {label}
+        <input type="time" value={value} onChange={(e) => onChange(e.target.value)} className={input} />
+      </label>
+      <button type="button" onClick={() => onChange('')} aria-label={`Clear ${label.toLowerCase()} time`} disabled={!value} className="min-h-11 shrink-0 px-1 text-sm font-bold text-brand disabled:opacity-50">
+        Clear
+      </button>
+    </div>
+  )
+}
+
+function PriorityPicker({ value, onChange }: { value: Prio; onChange: (p: Prio) => void }) {
+  return (
+    <div role="group" aria-label="Priority" className="flex gap-1.5">
+      {PRIOS.map(({ key, label }) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={value === key}
+          onClick={() => onChange(key)}
+          className={`flex min-h-11 flex-1 items-center justify-center rounded-full border-[1.5px] px-3 text-sm font-bold ${value === key ? 'border-accent bg-accent text-on-accent' : 'border-line'}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function Todos({ todos, picks, today }: { todos: TodoRow[]; picks: Pick[]; today: string }) {
   const tomorrow = addDays(today, 1)
@@ -122,7 +184,7 @@ function TodoItem({ todo }: { todo: TodoRow }) {
           {isDone && <Check size={20} aria-hidden />}
         </button>
         <div className={`min-w-0 flex-1 ${isDone ? 'opacity-65' : ''}`}>
-          <p className={`truncate font-bold ${isDone ? 'line-through' : ''}`}>
+          <p className={`truncate font-bold ${isDone ? 'line-through' : todo.priority === PRIORITY.low ? 'opacity-70' : ''}`}>
             <Link href={`/n/${todo.subtopic_id}`} className="hover:underline">{todo.subtopic_name}</Link>
           </p>
           <p className="flex items-center gap-1.5 text-xs opacity-75">
@@ -130,6 +192,7 @@ function TodoItem({ todo }: { todo: TodoRow }) {
               <Icon size={12} aria-hidden />
               {label}
             </span>
+            <TimePriority start={todo.start_time} end={todo.end_time} priority={todo.priority} />
             <span className="min-w-0 truncate">{todo.subject_name} › {todo.topic_name}</span>
           </p>
         </div>
@@ -157,6 +220,10 @@ function TodoMenu({ todo }: { todo: TodoRow }) {
 
 function TodoEditBody({ todo, close }: { todo: TodoRow; close: () => void }) {
   const [due, setDue] = useState(todo.due)
+  const [startTime, setStartTime] = useState(todo.start_time ?? '')
+  const [endTime, setEndTime] = useState(todo.end_time ?? '')
+  const [prio, setPrio] = useState<Prio>(PRIO_OF[todo.priority])
+  const [err, setErr] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [pending, start] = useTransition()
   return (
@@ -166,10 +233,12 @@ function TodoEditBody({ todo, close }: { todo: TodoRow; close: () => void }) {
         onSubmit={(e) => {
           e.preventDefault()
           setFailed(false)
+          setErr(null)
           start(async () => {
             try {
-              await moveTodo(todo.id, due)
-              close()
+              const r = await editTodo(todo.id, { due, start: startTime, end: endTime, priority: PRIORITY[prio] })
+              if (r.error) setErr(r.error)
+              else close()
             } catch {
               setFailed(true)
             }
@@ -177,6 +246,12 @@ function TodoEditBody({ todo, close }: { todo: TodoRow; close: () => void }) {
         }}
       >
         <input required type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due date" className={input} />
+        <div className="flex gap-2">
+          <TimeField label="Start" value={startTime} onChange={setStartTime} />
+          <TimeField label="End" value={endTime} onChange={setEndTime} />
+        </div>
+        <PriorityPicker value={prio} onChange={setPrio} />
+        {err && <p role="alert" className="text-sm text-brand">{err}</p>}
         {failed && failMsg}
         <button disabled={pending || !due} className={`${btn} w-full`}>Save</button>
       </form>
@@ -208,6 +283,10 @@ function AddBody({ picks, today, close }: { picks: Pick[]; today: string; close:
   const [picked, setPicked] = useState<Pick | null>(null)
   const [kind, setKind] = useState<TodoKind>('class')
   const [due, setDue] = useState(today)
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [prio, setPrio] = useState<Prio>('medium')
+  const [err, setErr] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [pending, start] = useTransition()
   const needle = q.trim().toLowerCase()
@@ -226,9 +305,11 @@ function AddBody({ picks, today, close }: { picks: Pick[]; today: string; close:
         e.preventDefault()
         if (!picked) return
         setFailed(false)
+        setErr(null)
         start(async () => {
           try {
-            if ((await addTodo(picked.id, kind, due)) === null) setFailed(true)
+            const r = await addTodo(picked.id, kind, due, startTime, endTime, PRIORITY[prio])
+            if (r.error) setErr(r.error)
             else close()
           } catch {
             setFailed(true)
@@ -274,8 +355,14 @@ function AddBody({ picks, today, close }: { picks: Pick[]; today: string; close:
             })}
           </div>
           <input required type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due date" className={input} />
+          <div className="flex gap-2">
+            <TimeField label="Start" value={startTime} onChange={setStartTime} />
+            <TimeField label="End" value={endTime} onChange={setEndTime} />
+          </div>
+          <PriorityPicker value={prio} onChange={setPrio} />
         </>
       )}
+      {err && <p role="alert" className="text-sm text-brand">{err}</p>}
       {failed && failMsg}
       <button disabled={pending || !picked || !due} className={`${btn} w-full`}>Add</button>
     </form>

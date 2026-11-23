@@ -301,6 +301,9 @@ export type TodoRow = {
   id: string
   kind: TodoKind
   due: string
+  start_time: string | null
+  end_time: string | null
+  priority: 1 | 2 | 3
   done_at: Date | null
   subtopic_id: string
   subtopic_name: string
@@ -310,7 +313,8 @@ export type TodoRow = {
 
 export async function getTodos(userId: string): Promise<TodoRow[]> {
   const rows = await sql`
-    select td.id, td.kind, td.due::text as due, td.done_at, td.subtopic_id,
+    select td.id, td.kind, td.due::text as due, to_char(td.start_time, 'HH24:MI') as start_time,
+      to_char(td.end_time, 'HH24:MI') as end_time, td.priority, td.done_at, td.subtopic_id,
       st.name as subtopic_name, t.name as topic_name, s.name as subject_name
     from todos td
     join subtopics st on st.id = td.subtopic_id
@@ -320,7 +324,7 @@ export async function getTodos(userId: string): Promise<TodoRow[]> {
       and (td.done_at is null or td.id in (
         select id from todos where user_id = ${userId} and done_at is not null
         order by done_at desc limit 30))
-    order by td.due, td.created_at, td.id`
+    order by td.due, (td.start_time is null), td.start_time, td.priority, td.created_at, td.id`
   return rows as TodoRow[]
 }
 
@@ -337,16 +341,22 @@ export async function getPickList(userId: string): Promise<PickRow[]> {
   return rows as PickRow[]
 }
 
-export async function createTodo(userId: string, subtopicId: string, kind: TodoKind, due: string): Promise<string | null> {
-  // Returns the existing open identical to-do instead of inserting a duplicate (re-tapping Add on a reopened chat).
+export async function createTodo(userId: string, subtopicId: string, kind: TodoKind, due: string,
+  opts: { start?: string | null; end?: string | null; priority?: 1 | 2 | 3 } = {}): Promise<string | null> {
+  // An existing open identical to-do (same sub-topic, kind, day and start time) gets the new end time and
+  // priority and is returned instead of inserting a duplicate. A different start time is a separate plan.
   const r = await sql`
     with ex as (
-      select id from todos
-      where user_id = ${userId} and subtopic_id::text = ${subtopicId} and kind = ${kind} and due = ${due}::date and done_at is null
-      limit 1),
+      update todos set end_time = ${opts.end ?? null}::time, priority = ${opts.priority ?? 2}
+      where id in (
+        select id from todos
+        where user_id = ${userId} and subtopic_id::text = ${subtopicId} and kind = ${kind} and due = ${due}::date and done_at is null
+          and start_time is not distinct from ${opts.start ?? null}::time
+        limit 1)
+      returning id),
     ins as (
-      insert into todos (user_id, subtopic_id, kind, due)
-      select ${userId}, st.id, ${kind}, ${due}::date
+      insert into todos (user_id, subtopic_id, kind, due, start_time, end_time, priority)
+      select ${userId}, st.id, ${kind}, ${due}::date, ${opts.start ?? null}::time, ${opts.end ?? null}::time, ${opts.priority ?? 2}
       from subtopics st join topics t on t.id = st.topic_id join subjects s on s.id = t.subject_id
       where st.id::text = ${subtopicId} and s.user_id = ${userId} and not exists (select 1 from ex)
       returning id)
@@ -399,9 +409,14 @@ export async function setTodoDone(userId: string, id: string, done: boolean): Pr
   return r.length > 0
 }
 
-export async function updateTodoDue(userId: string, id: string, due: string): Promise<boolean> {
+export async function updateTodo(
+  userId: string,
+  id: string,
+  v: { due: string; start: string | null; end: string | null; priority: 1 | 2 | 3 },
+): Promise<boolean> {
   const r = await sql`
-    update todos set due = ${due}::date where id::text = ${id} and user_id = ${userId} returning id`
+    update todos set due = ${v.due}::date, start_time = ${v.start}::time, end_time = ${v.end}::time, priority = ${v.priority}
+    where id::text = ${id} and user_id = ${userId} returning id`
   return r.length > 0
 }
 

@@ -4,8 +4,9 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { ClipboardList } from 'lucide-react'
 import { addTodoFromChat } from '@/app/actions'
-import { fmt, KIND } from '@/components/Todos'
+import { fmt, KIND, TimePriority } from '@/components/Todos'
 import type { Proposal } from '@/lib/proposal'
+import { PRIORITY } from '@/lib/todo-time'
 
 type State = 'idle' | 'pending' | 'added' | 'failed' | 'gone' | 'past' | 'dismissed'
 const ALERTS: Partial<Record<State, string>> = {
@@ -17,15 +18,23 @@ const ALERTS: Partial<Record<State, string>> = {
 // A to-do Mochi offered in chat. Nothing is created until the student taps Add.
 export function TodoProposal({ p }: { p: Proposal }) {
   const [state, setState] = useState<State>('idle')
+  const [err, setErr] = useState('')
   if (state === 'dismissed') return null
   const { label, Icon } = KIND[p.kind]
   const name = `${p.subtopic_name}, ${label}, ${fmt(p.due)}`
   const add = async () => {
     setState('pending')
+    setErr('')
     try {
-      const r = await addTodoFromChat(p.subtopic_id, p.kind, p.due)
-      setState(r === 'past' ? 'past' : r === null ? 'gone' : 'added')
+      const r = await addTodoFromChat(p.subtopic_id, p.kind, p.due, p.start ?? null, p.end ?? null, PRIORITY[p.priority ?? 'medium'])
+      if (!r.error) setState('added')
+      else if (r.code) setState(r.code)
+      else {
+        setErr(r.error)
+        setState('failed')
+      }
     } catch {
+      setErr('')
       setState('failed')
     }
   }
@@ -44,6 +53,7 @@ export function TodoProposal({ p }: { p: Proposal }) {
               {label}
             </span>
             <span>{fmt(p.due)}</span>
+            <TimePriority start={p.start} end={p.end} priority={PRIORITY[p.priority ?? 'medium']} />
           </p>
         </div>
       </div>
@@ -80,7 +90,7 @@ export function TodoProposal({ p }: { p: Proposal }) {
       )}
       {ALERTS[state] && (
         <p role="alert" className="pt-1 text-sm text-brand">
-          {ALERTS[state]}
+          {(state === 'failed' && err) || ALERTS[state]}
         </p>
       )}
     </div>

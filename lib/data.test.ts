@@ -211,6 +211,26 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
     const st = async (user: string, sid: string) =>
       (await d.getSubtopic(user, sid))!.subtopic
 
+    test('time and priority: create defaults, ordering, partial update, clearing', async () => {
+      const user = `${u1}-todotime`
+      const { subs } = await seed(user, ['a', 'b', 'c', 'd'])
+      const plain = (await d.createTodo(user, subs[0], 'class', today))!
+      const low = (await d.createTodo(user, subs[1], 'class', today, { priority: 3 }))!
+      const high = (await d.createTodo(user, subs[2], 'class', today, { priority: 1 }))!
+      const late = (await d.createTodo(user, subs[3], 'class', today, { start: '14:00', end: '15:30' }))!
+      const early = (await d.createTodo(user, subs[0], 'self', today, { start: '09:00' }))!
+      let rows = await d.getTodos(user)
+      expect(rows.map((r) => r.id)).toEqual([early, late, high, plain, low])
+      expect(rows.find((r) => r.id === plain)).toMatchObject({ start_time: null, end_time: null, priority: 2 })
+      expect(rows.find((r) => r.id === late)).toMatchObject({ start_time: '14:00', end_time: '15:30', priority: 2 })
+      expect(await d.updateTodo(u2, late, { due: today, start: '14:00', end: '15:30', priority: 1 })).toBe(false)
+      expect(await d.updateTodo(user, late, { due: today, start: '14:00', end: '15:30', priority: 1 })).toBe(true)
+      rows = await d.getTodos(user)
+      expect(rows.find((r) => r.id === late)).toMatchObject({ start_time: '14:00', end_time: '15:30', priority: 1, due: today })
+      expect(await d.updateTodo(user, late, { due: today, start: null, end: null, priority: 1 })).toBe(true)
+      expect((await d.getTodos(user)).find((r) => r.id === late)).toMatchObject({ start_time: null, end_time: null, priority: 1 })
+    })
+
     test('create, read, update, delete, scoping', async () => {
       const user = `${u1}-todo`
       const { subs } = await seed(user)
@@ -222,11 +242,11 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
       expect(await d.getTodos(u2)).toEqual([])
       expect((await d.getPickList(user))[0]).toMatchObject({ id: subs[0], in_class: false, self_study: false })
       expect(await d.getPickList(u2)).toEqual([])
-      expect(await d.updateTodoDue(u2, t, '2026-12-01')).toBe(false)
+      expect(await d.updateTodo(u2, t, { due: '2026-12-01', start: null, end: null, priority: 2 })).toBe(false)
       expect(await d.setTodoDone(u2, t, true)).toBe(false)
       expect(await d.deleteTodo(u2, t)).toBe(false)
       expect((await st(user, subs[0])).in_class).toBe(false)
-      expect(await d.updateTodoDue(user, t, '2026-12-01')).toBe(true)
+      expect(await d.updateTodo(user, t, { due: '2026-12-01', start: null, end: null, priority: 2 })).toBe(true)
       expect((await d.getTodos(user))[0].due).toBe('2026-12-01')
       expect(await d.setTodoDone(user, t, true)).toBe(true)
       expect((await d.getTodos(user))[0].done_at).not.toBeNull()
@@ -260,6 +280,28 @@ describe.skipIf(!run)('data layer (TEST_DATABASE_URL)', async () => {
       expect(await d.getTodos(user)).toHaveLength(1)
       await d.setTodoDone(user, t, true)
       expect(await d.createTodo(user, subs[0], 'revise', today)).not.toBe(t)
+    })
+
+    test('createTodo dedupe includes the start time', async () => {
+      const user = `${u1}-tododuptime`
+      const { subs } = await seed(user)
+      const untimed = (await d.createTodo(user, subs[0], 'revise', today))!
+      const morning = (await d.createTodo(user, subs[0], 'revise', today, { start: '09:30' }))!
+      expect(morning).not.toBe(untimed)
+      const evening = (await d.createTodo(user, subs[0], 'revise', today, { start: '16:00', end: '17:00' }))!
+      expect(evening).not.toBe(morning)
+      expect(await d.createTodo(user, subs[0], 'revise', today, { start: '09:30' })).toBe(morning)
+      expect(await d.getTodos(user)).toHaveLength(3)
+    })
+
+    test('re-adding an identical to-do updates its end time and priority', async () => {
+      const user = `${u1}-todoreadd`
+      const { subs } = await seed(user)
+      const t = (await d.createTodo(user, subs[0], 'revise', today, { start: '09:00', end: '10:00' }))!
+      expect(await d.createTodo(user, subs[0], 'revise', today, { start: '09:00', end: '11:00', priority: 1 })).toBe(t)
+      expect(await d.getTodos(user)).toMatchObject([{ id: t, start_time: '09:00', end_time: '11:00', priority: 1 }])
+      expect(await d.createTodo(u2, subs[0], 'revise', today, { start: '09:00', end: '12:00' })).toBeNull()
+      expect((await d.getTodos(user))[0].end_time).toBe('11:00')
     })
 
     test('self tick applies and undoes', async () => {

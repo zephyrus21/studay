@@ -50,6 +50,17 @@ create table if not exists todos (
   applied boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table todos add column if not exists start_time time;
+alter table todos add column if not exists end_time time;
+alter table todos add column if not exists priority smallint not null default 2;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'todos_priority_check') then
+    alter table todos add constraint todos_priority_check check (priority between 1 and 3);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'todos_time_check') then
+    alter table todos add constraint todos_time_check check (end_time is null or (start_time is not null and end_time > start_time));
+  end if;
+end $$;
 create index if not exists todos_user_due_idx on todos(user_id, due);
 create index if not exists todos_subtopic_id_idx on todos(subtopic_id);
 

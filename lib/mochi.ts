@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { TodoKind, getTree } from '@/lib/data'
+import { PRIORITY, todoTime } from '@/lib/todo-time'
 import { TODO_MARK, type Proposal } from '@/lib/proposal'
 
 export const MODEL = 'claude-haiku-5-5'
@@ -11,6 +12,7 @@ Say so when you are unsure instead of guessing. You are a study aid, not clinica
 Use the exam dates and today's date for countdowns and to suggest what to revise first.
 You can offer to-dos with the propose_todo tool (sub_topic ids are in the notes). Offer one when the student mentions an upcoming exam, asks what to study or revise, states an intention ("I'll study X tomorrow"), or has never-revised sub-topics facing a near exam.
 Convert relative dates ("Friday", "next week") using today's date. If the sub-topic is ambiguous, ask instead of guessing. Offer at most 3 per reply, and do not offer again in a chat after the student declines.
+Include start/end (HH:MM, 24-hour) only when the student mentions a time or asks for a timed plan. Set priority to high for gaps close to an exam and low for nice-to-haves; otherwise omit it (Medium).
 Always say in your text that you are offering (e.g. "Want me to add this to your to-dos?"); the student confirms with a card, you cannot add anything yourself.`
 
 // Client-defined, never executed: the server only reads the tool_use block from finalMessage().
@@ -24,6 +26,9 @@ export const PROPOSE_TODO_TOOL: Anthropic.Tool = {
       subtopic_id: { type: 'string', description: 'The [id: …] of a sub-topic from the notes' },
       kind: { type: 'string', enum: ['class', 'self', 'revise'] },
       due: { type: 'string', description: 'Date as YYYY-MM-DD' },
+      start: { type: 'string', description: 'Optional start time, HH:MM 24-hour' },
+      end: { type: 'string', description: 'Optional end time, HH:MM 24-hour, after start' },
+      priority: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Optional; omit for medium' },
     },
     required: ['subtopic_id', 'kind', 'due'],
     additionalProperties: false,
@@ -72,13 +77,22 @@ export function validProposals(blocks: unknown[], tree: Tree, today: string): Pr
       for (const x of t.subtopics) subs.set(x.id, { subtopic_id: x.id, subtopic_name: x.name, topic_name: t.name, kind: 'class', due: '' })
   const out: Proposal[] = []
   for (const b of blocks) {
-    const blk = b as { type?: unknown; name?: unknown; input?: { subtopic_id?: unknown; kind?: unknown; due?: unknown } | null } | null
+    const blk = b as { type?: unknown; name?: unknown; input?: { subtopic_id?: unknown; kind?: unknown; due?: unknown; start?: unknown; end?: unknown; priority?: unknown } | null } | null
     if (blk?.type !== 'tool_use' || blk.name !== 'propose_todo') continue
-    const { subtopic_id, kind, due } = blk.input ?? {}
+    const { subtopic_id, kind, due, start, end, priority } = blk.input ?? {}
     const base = typeof subtopic_id === 'string' ? subs.get(subtopic_id) : undefined
     if (!base || typeof kind !== 'string' || !KINDS.includes(kind) || !validDate(due) || due < today) continue
-    if (out.some((p) => p.subtopic_id === subtopic_id && p.kind === kind && p.due === due)) continue
-    out.push({ ...base, kind: kind as TodoKind, due })
+    // Invalid times are dropped, not the whole proposal; a valid start survives a bad end.
+    const full = todoTime(start as string, end as string)
+    const t = typeof full === 'string' ? todoTime(start as string, null) : full
+    const st = typeof t === 'object' ? t.start : null
+    if (out.some((p) => p.subtopic_id === subtopic_id && p.kind === kind && p.due === due && (p.start ?? null) === st)) continue
+    const p = typeof priority === 'string' && Object.hasOwn(PRIORITY, priority) ? (priority as Proposal['priority']) : undefined
+    out.push({
+      ...base, kind: kind as TodoKind, due,
+      ...(typeof t === 'object' && t.start ? { start: t.start, ...(t.end && { end: t.end }) } : {}),
+      ...(p && { priority: p }),
+    })
     if (out.length === 3) break
   }
   return out

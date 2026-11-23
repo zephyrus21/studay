@@ -106,6 +106,40 @@ describe('proposals', () => {
     expect(h).not.toContain('{')
     expect(h).toContain('(Proposed to-do: Beta blockers · Revise · 2026-11-28)')
   })
+  test('tool schema: time and priority are optional under strict', () => {
+    const sc = PROPOSE_TODO_TOOL.input_schema as { properties: Record<string, unknown>; required: string[] }
+    expect(PROPOSE_TODO_TOOL.strict).toBe(true)
+    expect(Object.keys(sc.properties)).toEqual(expect.arrayContaining(['start', 'end', 'priority']))
+    expect(sc.required).toEqual(['subtopic_id', 'kind', 'due'])
+    expect(SYSTEM_PROMPT).toContain('priority to high')
+  })
+  test('keeps valid time/priority, drops invalid ones but keeps the proposal', () => {
+    const [a] = validProposals([use({ ...ok, start: '14:00', end: '16:00', priority: 'high' })], tree, '2026-11-23')
+    expect(a).toMatchObject({ start: '14:00', end: '16:00', priority: 'high' })
+    const [b] = validProposals([use({ ...ok, start: '1pm', end: '16:00', priority: 'urgent' })], tree, '2026-11-23')
+    expect(b).not.toHaveProperty('start')
+    expect(b).not.toHaveProperty('end')
+    expect(b).not.toHaveProperty('priority')
+    const [c] = validProposals([use({ ...ok, start: '16:00', end: '14:00', priority: 'low' })], tree, '2026-11-23')
+    expect(c).toMatchObject({ start: '16:00', priority: 'low' })
+    expect(c).not.toHaveProperty('end')
+  })
+  test('dedupe includes the start time', () => {
+    const r = validProposals([use({ ...ok, start: '09:00' }), use({ ...ok, start: '09:00' }), use({ ...ok, start: '14:00' }), use(ok)], tree, '2026-11-23')
+    expect(r.map((x) => x.start)).toEqual(['09:00', '14:00', undefined])
+  })
+  test('valid start with invalid end keeps the start', () => {
+    const [a] = validProposals([use({ ...ok, start: '14:00', end: '13:00' })], tree, '2026-11-23')
+    expect(a).toMatchObject({ start: '14:00' })
+    expect(a).not.toHaveProperty('end')
+    const [b] = validProposals([use({ ...ok, start: '14:00', end: 'late' })], tree, '2026-11-23')
+    expect(b).toMatchObject({ start: '14:00' })
+  })
+  test('encode includes time and priority', () => {
+    const p = validProposals([use({ ...ok, start: '14:00', priority: 'low' })], tree, '2026-11-23')
+    expect(encodeProposals(p)).toContain('"start":"14:00"')
+    expect(encodeProposals(p)).toContain('"priority":"low"')
+  })
   test('buildRequest includes the tool and rewrites markers', () => {
     const stored = `Sure${encodeProposals(validProposals([use(ok)], tree, '2026-11-23'))}`
     const r = buildRequest({ tree, today: '2026-11-23', messages: [{ role: 'user', content: 'q' }, { role: 'assistant', content: stored }, { role: 'user', content: 'ok' }] })
